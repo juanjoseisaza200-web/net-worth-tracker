@@ -1,0 +1,1208 @@
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, DollarSign, BarChart3, RefreshCw } from 'lucide-react';
+import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
+import { formatCurrency, convertCurrency } from '../utils/currency';
+import AutocompleteInput, { Suggestion } from './AutocompleteInput';
+import { searchStockSymbols } from '../utils/stockSearch';
+import { searchCryptoSymbols } from '../utils/cryptoSearch';
+import { fetchStockPrices, fetchCryptoPrices } from '../utils/priceFetcher';
+
+interface InvestmentsProps {
+  data: AppData;
+  setData: (data: AppData) => void;
+  baseCurrency: Currency;
+  onCurrencyChange: (currency: Currency) => void;
+}
+
+const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
+
+export default function Investments({ data, setData, baseCurrency, onCurrencyChange }: InvestmentsProps) {
+  const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
+  const [showForm, setShowForm] = useState(false);
+  const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
+  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
+  const [priceUpdateTime, setPriceUpdateTime] = useState<Date | null>(null);
+
+  const [stockForm, setStockForm] = useState({
+    symbol: '',
+    shares: '',
+    purchasePrice: '',
+    currentPrice: '',
+    currency: 'USD' as Currency,
+    inputMode: 'shares' as 'shares' | 'money',
+    moneyAmount: '',
+  });
+
+  const [cryptoForm, setCryptoForm] = useState({
+    symbol: '',
+    amount: '',
+    purchasePrice: '',
+    currentPrice: '',
+    currency: 'USD' as Currency,
+    inputMode: 'coins' as 'coins' | 'money',
+    moneyAmount: '',
+  });
+
+  const [fixedForm, setFixedForm] = useState({
+    name: '',
+    amount: '',
+    interestRate: '',
+    maturityDate: '',
+    currency: 'USD' as Currency,
+  });
+
+  const [variableForm, setVariableForm] = useState({
+    name: '',
+    amount: '',
+    currentValue: '',
+    currency: 'USD' as Currency,
+  });
+
+  const resetForms = () => {
+    setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
+    setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
+    setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'USD' });
+    setVariableForm({ name: '', amount: '', currentValue: '', currency: 'USD' });
+    setEditingItem(null);
+    setShowForm(false);
+  };
+
+  const handleStockSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Calculate shares if in money mode
+    let shares = parseFloat(stockForm.shares);
+    let purchasePrice = parseFloat(stockForm.purchasePrice);
+    
+    if (stockForm.inputMode === 'money' && stockForm.moneyAmount && purchasePrice > 0) {
+      const moneyAmount = parseFloat(stockForm.moneyAmount);
+      shares = Math.round((moneyAmount / purchasePrice) * 100) / 100; // Round to 2 decimal places
+    } else {
+      shares = Math.round(shares * 100) / 100; // Round to 2 decimal places
+    }
+    
+    if (editingItem && editingItem.type === 'stock') {
+      setData({
+        ...data,
+        stocks: data.stocks.map(s =>
+          s.id === editingItem.id
+            ? {
+                ...s,
+                symbol: stockForm.symbol,
+                shares: shares,
+                purchasePrice: purchasePrice,
+                currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
+                currency: stockForm.currency,
+              }
+            : s
+        ),
+      });
+    } else {
+      const newStock: Stock = {
+        id: Date.now().toString(),
+        symbol: stockForm.symbol.toUpperCase(),
+        shares: shares,
+        purchasePrice: purchasePrice,
+        currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
+        currency: stockForm.currency,
+      };
+      setData({ ...data, stocks: [...data.stocks, newStock] });
+    }
+    resetForms();
+  };
+
+  const handleCryptoSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Calculate amount if in money mode
+    let amount: number;
+    let purchasePrice = parseFloat(cryptoForm.purchasePrice);
+    
+    if (cryptoForm.inputMode === 'money' && cryptoForm.moneyAmount && purchasePrice > 0) {
+      const moneyAmount = parseFloat(cryptoForm.moneyAmount);
+      // For crypto, preserve 8 decimal places (same as input step)
+      amount = Math.round((moneyAmount / purchasePrice) * 100000000) / 100000000;
+    } else {
+      // Use amount from form (coins mode)
+      amount = parseFloat(cryptoForm.amount) || 0;
+      // Round to 8 decimal places for crypto
+      amount = Math.round(amount * 100000000) / 100000000;
+    }
+    
+    if (editingItem && editingItem.type === 'crypto') {
+      setData({
+        ...data,
+        crypto: data.crypto.map(c =>
+          c.id === editingItem.id
+            ? {
+                ...c,
+                symbol: cryptoForm.symbol.toUpperCase(),
+                amount: amount,
+                purchasePrice: purchasePrice,
+                currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
+                currency: cryptoForm.currency,
+              }
+            : c
+        ),
+      });
+    } else {
+      const newCrypto: Crypto = {
+        id: Date.now().toString(),
+        symbol: cryptoForm.symbol.toUpperCase(),
+        amount: amount,
+        purchasePrice: purchasePrice,
+        currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
+        currency: cryptoForm.currency,
+      };
+      setData({ ...data, crypto: [...data.crypto, newCrypto] });
+    }
+    resetForms();
+  };
+
+  const handleFixedSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingItem && editingItem.type === 'fixed') {
+      setData({
+        ...data,
+        fixedIncome: data.fixedIncome.map(f =>
+          f.id === editingItem.id
+            ? {
+                ...f,
+                name: fixedForm.name,
+                amount: parseFloat(fixedForm.amount),
+                interestRate: parseFloat(fixedForm.interestRate),
+                maturityDate: fixedForm.maturityDate || undefined,
+                currency: fixedForm.currency,
+              }
+            : f
+        ),
+      });
+    } else {
+      const newFixed: FixedIncome = {
+        id: Date.now().toString(),
+        name: fixedForm.name,
+        amount: parseFloat(fixedForm.amount),
+        interestRate: parseFloat(fixedForm.interestRate),
+        maturityDate: fixedForm.maturityDate || undefined,
+        currency: fixedForm.currency,
+      };
+      setData({ ...data, fixedIncome: [...data.fixedIncome, newFixed] });
+    }
+    resetForms();
+  };
+
+  const handleVariableSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingItem && editingItem.type === 'variable') {
+      setData({
+        ...data,
+        variableInvestments: data.variableInvestments.map(v =>
+          v.id === editingItem.id
+            ? {
+                ...v,
+                name: variableForm.name,
+                amount: parseFloat(variableForm.amount),
+                currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
+                currency: variableForm.currency,
+              }
+            : v
+        ),
+      });
+    } else {
+      const newVariable: VariableInvestment = {
+        id: Date.now().toString(),
+        name: variableForm.name,
+        amount: parseFloat(variableForm.amount),
+        currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
+        currency: variableForm.currency,
+        type: 'other',
+      };
+      setData({ ...data, variableInvestments: [...data.variableInvestments, newVariable] });
+    }
+    resetForms();
+  };
+
+  const handleEdit = (type: InvestmentType, item: Stock | Crypto | FixedIncome | VariableInvestment) => {
+    setEditingItem({ type, id: item.id });
+    setShowForm(true);
+    setActiveTab(type);
+
+    if (type === 'stock') {
+      const s = item as Stock;
+      setStockForm({
+        symbol: s.symbol,
+        shares: s.shares.toString(),
+        purchasePrice: s.purchasePrice.toString(),
+        currentPrice: s.currentPrice?.toString() || '',
+        currency: s.currency,
+        inputMode: 'shares',
+        moneyAmount: '',
+      });
+    } else if (type === 'crypto') {
+      const c = item as Crypto;
+      setCryptoForm({
+        symbol: c.symbol,
+        amount: c.amount.toString(),
+        purchasePrice: c.purchasePrice.toString(),
+        currentPrice: c.currentPrice?.toString() || '',
+        currency: c.currency,
+        inputMode: 'coins',
+        moneyAmount: '',
+      });
+    } else if (type === 'fixed') {
+      const f = item as FixedIncome;
+      setFixedForm({
+        name: f.name,
+        amount: f.amount.toString(),
+        interestRate: f.interestRate.toString(),
+        maturityDate: f.maturityDate || '',
+        currency: f.currency,
+      });
+    } else {
+      const v = item as VariableInvestment;
+      setVariableForm({
+        name: v.name,
+        amount: v.amount.toString(),
+        currentValue: v.currentValue?.toString() || '',
+        currency: v.currency,
+      });
+    }
+  };
+
+  const handleDelete = (type: InvestmentType, id: string) => {
+    if (confirm('Are you sure you want to delete this investment?')) {
+      if (type === 'stock') {
+        setData({ ...data, stocks: data.stocks.filter(s => s.id !== id) });
+      } else if (type === 'crypto') {
+        setData({ ...data, crypto: data.crypto.filter(c => c.id !== id) });
+      } else if (type === 'fixed') {
+        setData({ ...data, fixedIncome: data.fixedIncome.filter(f => f.id !== id) });
+      } else {
+        setData({ ...data, variableInvestments: data.variableInvestments.filter(v => v.id !== id) });
+      }
+    }
+  };
+
+  // Auto-fetch prices on mount
+  useEffect(() => {
+    const fetchPrices = async () => {
+      if (data.stocks.length === 0 && data.crypto.length === 0) return;
+      
+      setIsRefreshingPrices(true);
+      const updatedData = { ...data };
+      
+      // Fetch stock prices
+      if (data.stocks.length > 0) {
+        const stockSymbols = data.stocks.map(s => s.symbol);
+        const stockPrices = await fetchStockPrices(stockSymbols);
+        
+        updatedData.stocks = data.stocks.map(stock => ({
+          ...stock,
+          currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
+        }));
+      }
+      
+      // Fetch crypto prices
+      if (data.crypto.length > 0) {
+        const cryptoSymbols = data.crypto.map(c => c.symbol);
+        const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
+        
+        updatedData.crypto = data.crypto.map(crypto => ({
+          ...crypto,
+          currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
+        }));
+      }
+      
+      setData(updatedData);
+      setIsRefreshingPrices(false);
+      setPriceUpdateTime(new Date());
+    };
+    
+    fetchPrices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run on mount
+
+  const handleRefreshPrices = async () => {
+    setIsRefreshingPrices(true);
+    const updatedData = { ...data };
+    
+    // Fetch stock prices
+    if (data.stocks.length > 0) {
+      const stockSymbols = data.stocks.map(s => s.symbol);
+      const stockPrices = await fetchStockPrices(stockSymbols);
+      
+      updatedData.stocks = data.stocks.map(stock => ({
+        ...stock,
+        currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
+      }));
+    }
+    
+    // Fetch crypto prices
+    if (data.crypto.length > 0) {
+      const cryptoSymbols = data.crypto.map(c => c.symbol);
+      const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
+      
+      updatedData.crypto = data.crypto.map(crypto => ({
+        ...crypto,
+        currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
+      }));
+    }
+    
+    setData(updatedData);
+    setIsRefreshingPrices(false);
+    setPriceUpdateTime(new Date());
+  };
+
+  const renderForm = () => {
+    if (!showForm) return null;
+
+    if (activeTab === 'stock') {
+      return (
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <h2 className="text-lg font-semibold mb-4">
+            {editingItem ? 'Edit Stock' : 'Add Stock'}
+          </h2>
+          <form onSubmit={handleStockSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+              <AutocompleteInput
+                value={stockForm.symbol}
+                onChange={(value) => setStockForm({ ...stockForm, symbol: value })}
+                onSelect={(suggestion: Suggestion) => {
+                  setStockForm({ ...stockForm, symbol: suggestion.symbol });
+                }}
+                placeholder="Search for stock symbol (e.g., AAPL)"
+                fetchSuggestions={searchStockSymbols}
+                minChars={1}
+              />
+            </div>
+            {/* Input Mode Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Input Method</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStockForm({ ...stockForm, inputMode: 'shares', moneyAmount: '' })}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                    stockForm.inputMode === 'shares'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  By Shares
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStockForm({ ...stockForm, inputMode: 'money', shares: '' })}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                    stockForm.inputMode === 'money'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  By Money Amount
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {stockForm.inputMode === 'shares' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shares</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0"
+                    value={stockForm.shares}
+                    onChange={(e) => setStockForm({ ...stockForm, shares: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0.4"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0"
+                    value={stockForm.moneyAmount}
+                    onChange={(e) => setStockForm({ ...stockForm, moneyAmount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="30.00"
+                  />
+                  {stockForm.moneyAmount && stockForm.purchasePrice && parseFloat(stockForm.purchasePrice) > 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      ≈ {(Math.round((parseFloat(stockForm.moneyAmount) / parseFloat(stockForm.purchasePrice)) * 100) / 100).toFixed(2)} shares
+                    </div>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  value={stockForm.currency}
+                  onChange={(e) => setStockForm({ ...stockForm, currency: e.target.value as Currency })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Purchase Price {stockForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
+                </label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={stockForm.purchasePrice}
+                  onChange={(e) => setStockForm({ ...stockForm, purchasePrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Price per share"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={stockForm.currentPrice}
+                  onChange={(e) => setStockForm({ ...stockForm, currentPrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
+                {editingItem ? 'Update' : 'Add'} Stock
+              </button>
+              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    if (activeTab === 'crypto') {
+      return (
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <h2 className="text-lg font-semibold mb-4">
+            {editingItem ? 'Edit Crypto' : 'Add Crypto'}
+          </h2>
+          <form onSubmit={handleCryptoSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+              <AutocompleteInput
+                value={cryptoForm.symbol}
+                onChange={(value) => setCryptoForm({ ...cryptoForm, symbol: value })}
+                onSelect={(suggestion: Suggestion) => {
+                  setCryptoForm({ ...cryptoForm, symbol: suggestion.symbol });
+                }}
+                placeholder="Search for crypto symbol (e.g., BTC)"
+                fetchSuggestions={searchCryptoSymbols}
+                minChars={1}
+              />
+            </div>
+            {/* Input Mode Toggle */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Input Method</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'coins', moneyAmount: '' })}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                    cryptoForm.inputMode === 'coins'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  By Coins
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'money', amount: '' })}
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                    cryptoForm.inputMode === 'money'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  By Money Amount
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {cryptoForm.inputMode === 'coins' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (Coins)</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.00000001"
+                    min="0"
+                    value={cryptoForm.amount}
+                    onChange={(e) => setCryptoForm({ ...cryptoForm, amount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="0.5"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    min="0"
+                    value={cryptoForm.moneyAmount}
+                    onChange={(e) => setCryptoForm({ ...cryptoForm, moneyAmount: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="30.00"
+                  />
+                  {cryptoForm.moneyAmount && cryptoForm.purchasePrice && parseFloat(cryptoForm.purchasePrice) > 0 && (
+                    <div className="text-xs text-gray-500 mt-1">
+                      ≈ {(Math.round((parseFloat(cryptoForm.moneyAmount) / parseFloat(cryptoForm.purchasePrice)) * 100000000) / 100000000).toFixed(8)} coins
+                    </div>
+                  )}
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  value={cryptoForm.currency}
+                  onChange={(e) => setCryptoForm({ ...cryptoForm, currency: e.target.value as Currency })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Purchase Price {cryptoForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
+                </label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={cryptoForm.purchasePrice}
+                  onChange={(e) => setCryptoForm({ ...cryptoForm, purchasePrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  placeholder="Price per coin"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={cryptoForm.currentPrice}
+                  onChange={(e) => setCryptoForm({ ...cryptoForm, currentPrice: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
+                {editingItem ? 'Update' : 'Add'} Crypto
+              </button>
+              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    if (activeTab === 'fixed') {
+      return (
+        <div className="bg-white rounded-lg shadow p-4 mb-4">
+          <h2 className="text-lg font-semibold mb-4">
+            {editingItem ? 'Edit Fixed Income' : 'Add Fixed Income'}
+          </h2>
+          <form onSubmit={handleFixedSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                required
+                value={fixedForm.name}
+                onChange={(e) => setFixedForm({ ...fixedForm, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="Savings Account, Bond, etc."
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={fixedForm.amount}
+                  onChange={(e) => setFixedForm({ ...fixedForm, amount: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  value={fixedForm.currency}
+                  onChange={(e) => setFixedForm({ ...fixedForm, currency: e.target.value as Currency })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                >
+                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  value={fixedForm.interestRate}
+                  onChange={(e) => setFixedForm({ ...fixedForm, interestRate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Maturity Date (optional)</label>
+                <input
+                  type="date"
+                  value={fixedForm.maturityDate}
+                  onChange={(e) => setFixedForm({ ...fixedForm, maturityDate: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
+                {editingItem ? 'Update' : 'Add'} Fixed Income
+              </button>
+              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h2 className="text-lg font-semibold mb-4">
+          {editingItem ? 'Edit Variable Investment' : 'Add Variable Investment'}
+        </h2>
+        <form onSubmit={handleVariableSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <input
+              type="text"
+              required
+              value={variableForm.name}
+              onChange={(e) => setVariableForm({ ...variableForm, name: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Real Estate, Commodities, etc."
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Initial Amount</label>
+              <input
+                type="number"
+                required
+                step="0.01"
+                min="0"
+                value={variableForm.amount}
+                onChange={(e) => setVariableForm({ ...variableForm, amount: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <select
+                value={variableForm.currency}
+                onChange={(e) => setVariableForm({ ...variableForm, currency: e.target.value as Currency })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              >
+                {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current Value (optional)</label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={variableForm.currentValue}
+              onChange={(e) => setVariableForm({ ...variableForm, currentValue: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
+              {editingItem ? 'Update' : 'Add'} Investment
+            </button>
+            <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              Cancel
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-4 space-y-4 pb-24">
+      {/* Header with Currency Selector */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-800">Investments</h1>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Currency:</label>
+            <select
+              value={baseCurrency}
+              onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
+            >
+              {currencies.map(currency => (
+                <option key={currency} value={currency}>{currency}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="flex border-b border-gray-200">
+          {[
+            { id: 'stock' as InvestmentType, label: 'Stocks', icon: TrendingUp },
+            { id: 'crypto' as InvestmentType, label: 'Crypto', icon: Coins },
+            { id: 'fixed' as InvestmentType, label: 'Fixed', icon: DollarSign },
+            { id: 'variable' as InvestmentType, label: 'Variable', icon: BarChart3 },
+          ].map(tab => {
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  if (!showForm) setShowForm(false);
+                }}
+                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${
+                  activeTab === tab.id
+                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="text-xs font-medium">{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Add Button */}
+      {!showForm && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
+        >
+          <Plus size={20} />
+          Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investment'}
+        </button>
+      )}
+
+      {/* Form */}
+      {renderForm()}
+
+      {/* Refresh Prices Button */}
+      {(activeTab === 'stock' || activeTab === 'crypto') && (data.stocks.length > 0 || data.crypto.length > 0) && (
+        <button
+          onClick={handleRefreshPrices}
+          disabled={isRefreshingPrices}
+          className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <RefreshCw size={18} className={isRefreshingPrices ? 'animate-spin' : ''} />
+          {isRefreshingPrices ? 'Updating Prices...' : 'Refresh Prices'}
+        </button>
+      )}
+
+      {priceUpdateTime && (
+        <div className="text-xs text-gray-500 text-center">
+          Last updated: {priceUpdateTime.toLocaleTimeString()}
+        </div>
+      )}
+
+      {/* Summary Cards */}
+      {activeTab === 'stock' && data.stocks.length > 0 && (() => {
+        const totalCurrentValue = data.stocks.reduce((sum, stock) => {
+          const currentPrice = stock.currentPrice || stock.purchasePrice;
+          const value = currentPrice * stock.shares;
+          return sum + convertCurrency(value, stock.currency, baseCurrency);
+        }, 0);
+        const totalInvested = data.stocks.reduce((sum, stock) => {
+          const value = stock.purchasePrice * stock.shares;
+          return sum + convertCurrency(value, stock.currency, baseCurrency);
+        }, 0);
+        const totalGainLoss = totalCurrentValue - totalInvested;
+        const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
+        
+        return (
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Total Stocks Value</span>
+              <TrendingUp size={20} className="text-blue-500" />
+            </div>
+            <div className="text-2xl font-bold text-blue-600 mb-2">
+              {formatCurrency(totalCurrentValue, baseCurrency)}
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">Invested: {formatCurrency(totalInvested, baseCurrency)}</span>
+              <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss, baseCurrency)} 
+                ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'crypto' && data.crypto.length > 0 && (() => {
+        const totalCurrentValue = data.crypto.reduce((sum, crypto) => {
+          const currentPrice = crypto.currentPrice || crypto.purchasePrice;
+          const value = currentPrice * crypto.amount;
+          return sum + convertCurrency(value, crypto.currency, baseCurrency);
+        }, 0);
+        const totalInvested = data.crypto.reduce((sum, crypto) => {
+          const value = crypto.purchasePrice * crypto.amount;
+          return sum + convertCurrency(value, crypto.currency, baseCurrency);
+        }, 0);
+        const totalGainLoss = totalCurrentValue - totalInvested;
+        const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
+        
+        return (
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Total Crypto Value</span>
+              <Coins size={20} className="text-purple-500" />
+            </div>
+            <div className="text-2xl font-bold text-purple-600 mb-2">
+              {formatCurrency(totalCurrentValue, baseCurrency)}
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-gray-500">Invested: {formatCurrency(totalInvested, baseCurrency)}</span>
+              <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss, baseCurrency)} 
+                ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'fixed' && data.fixedIncome.length > 0 && (() => {
+        const totalValue = data.fixedIncome.reduce((sum, fixed) => {
+          return sum + convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+        }, 0);
+        
+        return (
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Total Fixed Income Value</span>
+              <DollarSign size={20} className="text-green-500" />
+            </div>
+            <div className="text-2xl font-bold text-green-600">
+              {formatCurrency(totalValue, baseCurrency)}
+            </div>
+            <div className="text-sm text-gray-500 mt-1">
+              {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        );
+      })()}
+
+      {activeTab === 'variable' && data.variableInvestments.length > 0 && (() => {
+        const totalValue = data.variableInvestments.reduce((sum, inv) => {
+          const value = inv.currentValue || inv.amount;
+          return sum + convertCurrency(value, inv.currency, baseCurrency);
+        }, 0);
+        
+        return (
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-sm text-gray-600">Total Variable Investments Value</span>
+              <BarChart3 size={20} className="text-yellow-500" />
+            </div>
+            <div className="text-2xl font-bold text-yellow-600">
+              {formatCurrency(totalValue, baseCurrency)}
+            </div>
+            <div className="text-sm text-gray-500 mt-1">
+              {data.variableInvestments.length} investment{data.variableInvestments.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* List */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investments'}
+          </h2>
+        </div>
+        {(() => {
+          if (activeTab === 'stock') {
+            if (data.stocks.length === 0) {
+              return <div className="p-8 text-center text-gray-500">No stocks added yet</div>;
+            }
+            return (
+              <div className="divide-y divide-gray-100">
+                {data.stocks.map(stock => {
+                  const currentPrice = stock.currentPrice || stock.purchasePrice;
+                  const currentValue = currentPrice * stock.shares;
+                  const purchaseValue = stock.purchasePrice * stock.shares;
+                  const gainLoss = currentValue - purchaseValue;
+                  const gainLossPercent = ((gainLoss / purchaseValue) * 100);
+                  
+                  const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
+                  const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
+                  const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
+                  
+                  return (
+                    <div key={stock.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg text-gray-800">{stock.symbol}</div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
+                          </div>
+                          {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                            <div className="text-sm text-gray-500">
+                              Current: {formatCurrency(stock.currentPrice, stock.currency)}
+                            </div>
+                          )}
+                          <div className="text-lg font-bold text-blue-600 mt-2">
+                            {formatCurrency(convertedCurrentValue, baseCurrency)}
+                          </div>
+                          {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                            <div className="mt-2 space-y-1">
+                              <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {gainLoss >= 0 ? '+' : ''}{formatCurrency(convertedGainLoss, baseCurrency)} 
+                                ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Invested: {formatCurrency(convertedPurchaseValue, baseCurrency)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit('stock', stock)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete('stock', stock.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          if (activeTab === 'crypto') {
+            if (data.crypto.length === 0) {
+              return <div className="p-8 text-center text-gray-500">No crypto added yet</div>;
+            }
+            return (
+              <div className="divide-y divide-gray-100">
+                {data.crypto.map(crypto => {
+                  const currentPrice = crypto.currentPrice || crypto.purchasePrice;
+                  const currentValue = currentPrice * crypto.amount;
+                  const purchaseValue = crypto.purchasePrice * crypto.amount;
+                  const gainLoss = currentValue - purchaseValue;
+                  const gainLossPercent = ((gainLoss / purchaseValue) * 100);
+                  
+                  const convertedCurrentValue = convertCurrency(currentValue, crypto.currency, baseCurrency);
+                  const convertedPurchaseValue = convertCurrency(purchaseValue, crypto.currency, baseCurrency);
+                  const convertedGainLoss = convertCurrency(gainLoss, crypto.currency, baseCurrency);
+                  
+                  return (
+                    <div key={crypto.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg text-gray-800">{crypto.symbol}</div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            {crypto.amount.toFixed(8)} {crypto.symbol} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
+                          </div>
+                          {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
+                            <div className="text-sm text-gray-500">
+                              Current: {formatCurrency(crypto.currentPrice, crypto.currency)}
+                            </div>
+                          )}
+                          <div className="text-lg font-bold text-purple-600 mt-2">
+                            {formatCurrency(convertedCurrentValue, baseCurrency)}
+                          </div>
+                          {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
+                            <div className="mt-2 space-y-1">
+                              <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                {gainLoss >= 0 ? '+' : ''}{formatCurrency(convertedGainLoss, baseCurrency)} 
+                                ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                Invested: {formatCurrency(convertedPurchaseValue, baseCurrency)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit('crypto', crypto)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete('crypto', crypto.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          if (activeTab === 'fixed') {
+            if (data.fixedIncome.length === 0) {
+              return <div className="p-8 text-center text-gray-500">No fixed income investments added yet</div>;
+            }
+            return (
+              <div className="divide-y divide-gray-100">
+                {data.fixedIncome.map(fixed => {
+                  const convertedValue = convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+                  return (
+                    <div key={fixed.id} className="p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="font-semibold text-lg text-gray-800">{fixed.name}</div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            Interest Rate: {fixed.interestRate}%
+                          </div>
+                          {fixed.maturityDate && (
+                            <div className="text-sm text-gray-500">
+                              Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
+                            </div>
+                          )}
+                          <div className="text-lg font-bold text-green-600 mt-2">
+                            {formatCurrency(convertedValue, baseCurrency)}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleEdit('fixed', fixed)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete('fixed', fixed.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+
+          if (data.variableInvestments.length === 0) {
+            return <div className="p-8 text-center text-gray-500">No variable investments added yet</div>;
+          }
+          return (
+            <div className="divide-y divide-gray-100">
+              {data.variableInvestments.map(inv => {
+                const value = inv.currentValue || inv.amount;
+                const convertedValue = convertCurrency(value, inv.currency, baseCurrency);
+                return (
+                  <div key={inv.id} className="p-4">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="font-semibold text-lg text-gray-800">{inv.name}</div>
+                        <div className="text-sm text-gray-500 mt-1">
+                          Initial: {formatCurrency(inv.amount, inv.currency)}
+                        </div>
+                        {inv.currentValue && (
+                          <div className="text-sm text-gray-500">
+                            Current: {formatCurrency(inv.currentValue, inv.currency)}
+                          </div>
+                        )}
+                        <div className="text-lg font-bold text-yellow-600 mt-2">
+                          {formatCurrency(convertedValue, baseCurrency)}
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit('variable', inv)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete('variable', inv.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+}
+
