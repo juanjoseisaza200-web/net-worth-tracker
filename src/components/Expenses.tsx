@@ -11,7 +11,7 @@ interface ExpensesProps {
 }
 
 const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
-const expenseCategories = ['Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
+const expenseCategories = ['Food','Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
 const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';
 
