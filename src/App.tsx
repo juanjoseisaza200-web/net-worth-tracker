@@ -35,6 +35,8 @@ function App() {
               if (mounted) {
                 console.log("Cloud data updated", cloudData);
                 setData(cloudData);
+                // Sync cloud data to local storage so next boot is fresh
+                saveData(cloudData);
                 setBaseCurrency(cloudData.baseCurrency);
                 setLoading(false);
               }
@@ -64,16 +66,19 @@ function App() {
     };
   }, []); // Only run on mount, but depends on load functions
 
-  // Explicit save handler - passed to components to trigger cloud saves on USER ACTION only
-  const handleSaveData = (newData: AppData) => {
+  // User Actions -> Cloud Save
+  const handleCloudSave = (newData: AppData) => {
     setData(newData);
-    // Save to local storage
     saveData(newData);
-
-    // Save to cloud if user is logged in
     if (user) {
       saveDataToCloud(user.uid, newData);
     }
+  };
+
+  // Background Updates -> Local Save Only
+  const handleLocalSave = (newData: AppData) => {
+    setData(newData);
+    saveData(newData);
   };
 
   // Removed auto-save useEffect to prevent overwriting cloud data on initialization
@@ -86,20 +91,13 @@ function App() {
   const handleCurrencyChange = (currency: Currency) => {
     setBaseCurrency(currency);
     const newData = { ...data, baseCurrency: currency };
-    handleSaveData(newData);
+    handleCloudSave(newData);
   };
 
   const handleManualSync = async () => {
     if (user) {
       await saveDataToCloud(user.uid, data);
     }
-  };
-
-  // Local update handler - updates UI and local storage BUT NOT Cloud
-  // Use this for background tasks like auto-refreshing prices to avoid overwriting cloud data with stale local state
-  const handleLocalDataUpdate = (newData: AppData) => {
-    setData(newData);
-    saveData(newData);
   };
 
   if (loading) {
@@ -140,9 +138,9 @@ function App() {
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>
             <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/expenses" element={<Expenses data={data} setData={handleSaveData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/investments" element={<Investments data={data} setData={handleSaveData} saveLocalData={handleLocalDataUpdate} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
-            <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleSaveData} />} />
+            <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
+            <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>
         </main>
         <Navigation />
