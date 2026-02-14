@@ -43,7 +43,7 @@ export const formatCompactCurrency = (amount: number, currency: Currency): strin
     currency: currency,
     notation: 'compact',
     compactDisplay: 'short',
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   });
   return formatter.format(amount);
 };
