@@ -48,6 +48,32 @@ export const formatCompactCurrency = (amount: number, currency: Currency): strin
   return formatter.format(amount);
 };
 
+export const formatAdaptiveCurrency = (amount: number, currency: Currency): string => {
+  // 1. Try full formatting
+  const fullFormat = formatCurrency(amount, currency);
+
+  // If it fits (heuristic: < 14 chars), return full format
+  if (fullFormat.length < 14) {
+    return fullFormat;
+  }
+
+  // 2. Try removing cents if it helps fit
+  const noCentsFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  const noCentsFormat = noCentsFormatter.format(amount);
+
+  if (noCentsFormat.length < 14) {
+    return noCentsFormat;
+  }
+
+  // 3. Fallback to compact notation
+  return formatCompactCurrency(amount, currency);
+};
+
 // Function to fetch real-time exchange rates (placeholder for API integration)
 export const fetchExchangeRates = async (): Promise<void> => {
   try {
