@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, TrendingUp, DollarSign, Settings, Plus } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Plus } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
 import Investments from './components/Investments';
