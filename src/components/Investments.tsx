@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3 } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
