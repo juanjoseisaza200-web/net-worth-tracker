@@ -328,7 +328,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
       // 3. Local-First Update
-      setIsRefreshingPrices(true);
+      // setIsRefreshingPrices(true); // State removed as unused
       const updatedData = { ...data };
       let hasUpdates = false;
 
@@ -372,7 +372,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         setPriceUpdateTime(new Date());
       }
       if (isCurrent) {
-        setIsRefreshingPrices(false);
+        // setIsRefreshingPrices(false); // State removed as unused
       }
     };
 
