@@ -36,15 +36,21 @@ export const calculateNetWorth = (data: AppData, targetCurrency: Currency): numb
 
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
   const expenses = data.expenses.filter(expense => {
     if (!period) return true;
-    
-    const expenseDate = new Date(expense.date);
+
+    // Parse YYYY-MM-DD directly to avoid timezone issues
+    const [yearStr, monthStr] = expense.date.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1; // 0-indexed month
+
     if (period === 'month') {
-      return expenseDate.getMonth() === now.getMonth() && 
-             expenseDate.getFullYear() === now.getFullYear();
+      return year === currentYear && month === currentMonth;
     } else {
-      return expenseDate.getFullYear() === now.getFullYear();
+      return year === currentYear;
     }
   });
 
@@ -55,18 +61,23 @@ export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, 
 
 export const calculateTotalIncome = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
   let total = 0;
 
   // Calculate one-time income
   const incomes = data.incomes.filter(income => {
     if (!period) return true;
-    
-    const incomeDate = new Date(income.date);
+
+    // Parse YYYY-MM-DD directly to avoid timezone issues
+    const [yearStr, monthStr] = income.date.split('-');
+    const year = parseInt(yearStr);
+    const month = parseInt(monthStr) - 1; // 0-indexed month
+
     if (period === 'month') {
-      return incomeDate.getMonth() === now.getMonth() && 
-             incomeDate.getFullYear() === now.getFullYear();
+      return year === currentYear && month === currentMonth;
     } else {
-      return incomeDate.getFullYear() === now.getFullYear();
+      return year === currentYear;
     }
   });
 
