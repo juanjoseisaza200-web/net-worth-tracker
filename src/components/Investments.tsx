@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { User } from 'firebase/auth';
 import { Plus, Trash2, Edit2, TrendingUp, Coins, DollarSign, BarChart3, RefreshCw } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
@@ -6,18 +7,20 @@ import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices } from '../utils/priceFetcher';
+import { refreshInvestmentPrices } from '../utils/storage';
 
 interface InvestmentsProps {
   data: AppData;
   setData: (data: AppData) => void;
   baseCurrency: Currency;
   onCurrencyChange: (currency: Currency) => void;
+  user: User | null;
 }
 
 const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
 type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
 
-export default function Investments({ data, setData, baseCurrency, onCurrencyChange }: InvestmentsProps) {
+export default function Investments({ data, setData, baseCurrency, onCurrencyChange, user }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
@@ -328,34 +331,20 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
   }, []); // Only run on mount
 
   const handleRefreshPrices = async () => {
+    if (!user) return; // Should be authenticated to use cloud function
+
     setIsRefreshingPrices(true);
-    const updatedData = { ...data };
-
-    // Fetch stock prices
-    if (data.stocks.length > 0) {
-      const stockSymbols = data.stocks.map(s => s.symbol);
-      const stockPrices = await fetchStockPrices(stockSymbols);
-
-      updatedData.stocks = data.stocks.map(stock => ({
-        ...stock,
-        currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
-      }));
+    try {
+      await refreshInvestmentPrices(user.uid);
+      // We don't need to manually setData here because the onSnapshot listener in App.tsx 
+      // will automatically pick up the changes and update the UI.
+      setPriceUpdateTime(new Date());
+    } catch (error) {
+      console.error("Failed to refresh prices:", error);
+      alert("Failed to update prices. Please check your connection.");
+    } finally {
+      setIsRefreshingPrices(false);
     }
-
-    // Fetch crypto prices
-    if (data.crypto.length > 0) {
-      const cryptoSymbols = data.crypto.map(c => c.symbol);
-      const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
-
-      updatedData.crypto = data.crypto.map(crypto => ({
-        ...crypto,
-        currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
-      }));
-    }
-
-    setData(updatedData);
-    setIsRefreshingPrices(false);
-    setPriceUpdateTime(new Date());
   };
 
   const renderForm = () => {
