@@ -19,6 +19,7 @@ function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
+  const [isCloudSynced, setIsCloudSynced] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -38,6 +39,7 @@ function App() {
                 // Sync cloud data to local storage so next boot is fresh
                 saveData(cloudData);
                 setBaseCurrency(cloudData.baseCurrency);
+                setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
                 setLoading(false);
               }
             });
@@ -71,6 +73,14 @@ function App() {
     setData(newData);
     saveData(newData);
     if (user) {
+      // CRITICAL SAFETY GUARD:
+      // Prevent overwriting cloud data if we haven't successfully synced yet.
+      // This stops "Stale Tab" overwrites where an old open tab auto-saves its
+      // old state before downloading the new state, wiping your data.
+      if (!isCloudSynced) {
+        console.warn("BLOCKED: Attempted to save to cloud before initial sync to prevent data loss.");
+        return;
+      }
       saveDataToCloud(user.uid, newData);
     }
   };

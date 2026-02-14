@@ -8,6 +8,7 @@ interface SettingsProps {
     user: User;
     onLogout: () => void;
     onSync: () => Promise<void>;
+    onHardReset?: () => void;
     data: AppData;
     setData: (data: AppData) => void;
 }
@@ -109,7 +110,7 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                 </div>
 
                 <div className="text-center text-xs text-gray-400 mt-8">
-                    Net Worth Tracker v1.1.4
+                    Net Worth Tracker v1.1.5 - Secure Sync Active 🔒
 
                 </div>
             </div>
