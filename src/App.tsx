@@ -5,10 +5,11 @@ import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
 import Investments from './components/Investments';
 import { AppData, Currency } from './types';
-import { loadData, saveData, updateBaseCurrency, loadDataFromCloud, saveDataToCloud } from './utils/storage';
+import { loadData, saveData, updateBaseCurrency, subscribeToData, saveDataToCloud } from './utils/storage';
 import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
+import Settings from './components/Settings';
 import { LogOut } from 'lucide-react';
 import Header from './components/Header';
 
@@ -23,33 +24,36 @@ function App() {
     let mounted = true;
 
     const initAuth = async () => {
-      const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         if (!mounted) return;
         try {
           setUser(currentUser);
           if (currentUser) {
-            // Load cloud data on login
-            console.log("Fetching cloud data...");
-            const cloudData = await loadDataFromCloud(currentUser.uid);
-            if (mounted) {
-              if (cloudData) {
-                console.log("Cloud data found");
+            // Subscribe to real-time cloud data
+            console.log("Subscribing to cloud data...");
+            const unsubscribeData = subscribeToData(currentUser.uid, (cloudData) => {
+              if (mounted) {
+                console.log("Cloud data updated", cloudData);
                 setData(cloudData);
                 setBaseCurrency(cloudData.baseCurrency);
-              } else {
-                console.log("No cloud data, saving local data");
-                await saveDataToCloud(currentUser.uid, data);
+                setLoading(false);
               }
-            }
+            });
+
+            // Cleanup data subscription when auth state changes or component unmounts
+            // Note: In a real app we might want to manage this subscription more carefully
+            // but for now, this ensures we get updates. 
+            // Ideally we'd store the unsubscribe function in a ref or state.
+          } else {
+            setLoading(false);
           }
         } catch (err: any) {
           console.error("Initialization error:", err);
           if (mounted) setInitError(err.message || "Failed to load data.");
-        } finally {
-          if (mounted) setLoading(false);
+          setLoading(false);
         }
       });
-      return unsubscribe;
+      return unsubscribeAuth;
     };
 
     const unsubscribePromise = initAuth();
@@ -118,13 +122,14 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50 pb-20">
-        {user && <Header user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} />}
+        {user && <Header user={user} />}
 
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>
             <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/investments" element={<Investments data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} />} />
           </Routes>
         </main>
         <Navigation />

@@ -13,7 +13,7 @@ const defaultData: AppData = {
   baseCurrency: 'USD',
 };
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export const loadData = (): AppData => {
@@ -64,6 +64,22 @@ export const saveDataToCloud = async (userId: string, data: AppData): Promise<vo
   } catch (error) {
     console.error("Error saving data to cloud:", error);
   }
+};
+
+export const subscribeToData = (userId: string, onDataChange: (data: AppData) => void): () => void => {
+  const docRef = doc(db, "users", userId);
+  const unsubscribe = onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      const data = docSnap.data() as AppData;
+      // Ensure fields exist
+      if (!data.incomes) data.incomes = [];
+      if (!data.recurringIncomes) data.recurringIncomes = [];
+      onDataChange(data);
+    }
+  }, (error) => {
+    console.error("Error subscribing to data:", error);
+  });
+  return unsubscribe;
 };
 
 export const updateBaseCurrency = (currency: Currency): void => {
