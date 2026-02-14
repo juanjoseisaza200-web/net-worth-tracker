@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, PieChart } from 'lucide-react';
 import { AppData, Currency } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome } from '../utils/calculations';
-import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency } from '../utils/currency';
+import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
 
 interface DashboardProps {
@@ -125,7 +125,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-red-600 truncate max-w-[120px]">
-                      {formatAdaptiveCurrency(expense.amount, expense.currency)}
+                      {formatCurrencyNoDecimals(expense.amount, expense.currency)}
                     </div>
                     <div className="text-xs text-gray-500">
                       {formatDateForDisplay(expense.date)}

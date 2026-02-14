@@ -91,3 +91,13 @@ export const fetchExchangeRates = async (): Promise<void> => {
   }
 };
 
+export const formatCurrencyNoDecimals = (amount: number, currency: Currency): string => {
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+  return formatter.format(amount);
+};
+
