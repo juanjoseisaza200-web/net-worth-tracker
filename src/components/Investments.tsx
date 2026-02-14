@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, DollarSign, BarChart3, RefreshCw } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3 } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
-import { fetchStockPrices, fetchCryptoPrices } from '../utils/priceFetcher';
+import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 
 interface InvestmentsProps {
   data: AppData;
@@ -24,7 +24,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
-  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [priceUpdateTime, setPriceUpdateTime] = useState<Date | null>(null);
 
   const [stockForm, setStockForm] = useState({
@@ -62,6 +62,26 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     currency: 'USD' as Currency,
   });
 
+  const handleStockSelect = async (suggestion: Suggestion) => {
+    setStockForm(prev => ({ ...prev, symbol: suggestion.symbol }));
+    setIsFetchingPrice(true);
+    const price = await fetchStockPrice(suggestion.symbol);
+    if (price) {
+      setStockForm(prev => ({ ...prev, currentPrice: price.toString() }));
+    }
+    setIsFetchingPrice(false);
+  };
+
+  const handleCryptoSelect = async (suggestion: Suggestion) => {
+    setCryptoForm(prev => ({ ...prev, symbol: suggestion.symbol }));
+    setIsFetchingPrice(true);
+    const price = await fetchCryptoPrice(suggestion.symbol);
+    if (price) {
+      setCryptoForm(prev => ({ ...prev, currentPrice: price.toString() }));
+    }
+    setIsFetchingPrice(false);
+  };
+
   const resetForms = () => {
     setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
     setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
@@ -76,7 +96,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     // Calculate shares if in money mode
     let shares = parseFloat(stockForm.shares);
-    let purchasePrice = parseFloat(stockForm.purchasePrice);
+    const purchasePrice = parseFloat(stockForm.purchasePrice);
 
     if (stockForm.inputMode === 'money' && stockForm.moneyAmount && purchasePrice > 0) {
       const moneyAmount = parseFloat(stockForm.moneyAmount);
@@ -123,7 +143,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     // Calculate amount if in money mode
     let amount: number;
-    let purchasePrice = parseFloat(cryptoForm.purchasePrice);
+    const purchasePrice = parseFloat(cryptoForm.purchasePrice);
 
     if (cryptoForm.inputMode === 'money' && cryptoForm.moneyAmount && purchasePrice > 0) {
       const moneyAmount = parseFloat(cryptoForm.moneyAmount);

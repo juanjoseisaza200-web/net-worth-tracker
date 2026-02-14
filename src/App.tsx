@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, TrendingUp, DollarSign, Plus } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
 import Investments from './components/Investments';
@@ -10,7 +10,6 @@ import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
 import Settings from './components/Settings';
-import { LogOut } from 'lucide-react';
 import Header from './components/Header';
 
 function App() {
@@ -32,7 +31,7 @@ function App() {
           if (currentUser) {
             // Subscribe to real-time cloud data
             console.log("Subscribing to cloud data...");
-            const unsubscribeData = subscribeToData(currentUser.uid, (cloudData) => {
+            subscribeToData(currentUser.uid, (cloudData) => {
               if (mounted) {
                 console.log("Cloud data updated", cloudData);
                 setData(cloudData);
