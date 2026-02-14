@@ -21,7 +21,7 @@ export const convertCurrency = (
   to: Currency
 ): number => {
   if (from === to) return amount;
-  
+
   // Convert to USD first, then to target currency
   const usdAmount = amount * exchangeRates[from];
   return usdAmount / exchangeRates[to];
@@ -33,6 +33,17 @@ export const formatCurrency = (amount: number, currency: Currency): string => {
     currency: currency,
     minimumFractionDigits: currency === 'JPY' ? 0 : 2,
     maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+  });
+  return formatter.format(amount);
+};
+
+export const formatCompactCurrency = (amount: number, currency: Currency): string => {
+  const formatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    notation: 'compact',
+    compactDisplay: 'short',
+    maximumFractionDigits: 1,
   });
   return formatter.format(amount);
 };

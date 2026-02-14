@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, PieChart } from 'lucide-react';
 import { AppData, Currency } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome } from '../utils/calculations';
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency, formatCompactCurrency } from '../utils/currency';
 
 interface DashboardProps {
   data: AppData;
@@ -42,7 +42,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
           </select>
         </div>
         <div className="text-4xl font-bold text-blue-600">
-          {formatCurrency(netWorth, baseCurrency)}
+          {formatCompactCurrency(netWorth, baseCurrency)}
         </div>
       </div>
 
@@ -54,7 +54,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
             <TrendingUp size={20} className="text-green-500" />
           </div>
           <div className="text-2xl font-bold text-green-600">
-            {formatCurrency(monthlyIncome, baseCurrency)}
+            {formatCompactCurrency(monthlyIncome, baseCurrency)}
           </div>
         </div>
 
@@ -64,7 +64,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
             <TrendingDown size={20} className="text-red-500" />
           </div>
           <div className="text-2xl font-bold text-red-600">
-            {formatCurrency(monthlyExpenses, baseCurrency)}
+            {formatCompactCurrency(monthlyExpenses, baseCurrency)}
           </div>
         </div>
       </div>
@@ -76,7 +76,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
           <DollarSign size={20} className={netMonthly >= 0 ? 'text-green-500' : 'text-red-500'} />
         </div>
         <div className={`text-3xl font-bold ${netMonthly >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {formatCurrency(netMonthly, baseCurrency)}
+          {formatCompactCurrency(netMonthly, baseCurrency)}
         </div>
       </div>
 
@@ -123,7 +123,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                     <div className="text-sm text-gray-500">{expense.category}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-red-600">
+                    <div className="font-semibold text-red-600 truncate max-w-[100px]">
                       {formatCurrency(expense.amount, expense.currency)}
                     </div>
                     <div className="text-xs text-gray-500">

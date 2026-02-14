@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit2, TrendingUp, Coins, DollarSign, BarChart3, RefreshCw } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
-import { formatCurrency, convertCurrency } from '../utils/currency';
+import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
@@ -70,31 +70,31 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
 
   const handleStockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Calculate shares if in money mode
     let shares = parseFloat(stockForm.shares);
     let purchasePrice = parseFloat(stockForm.purchasePrice);
-    
+
     if (stockForm.inputMode === 'money' && stockForm.moneyAmount && purchasePrice > 0) {
       const moneyAmount = parseFloat(stockForm.moneyAmount);
       shares = Math.round((moneyAmount / purchasePrice) * 100) / 100; // Round to 2 decimal places
     } else {
       shares = Math.round(shares * 100) / 100; // Round to 2 decimal places
     }
-    
+
     if (editingItem && editingItem.type === 'stock') {
       setData({
         ...data,
         stocks: data.stocks.map(s =>
           s.id === editingItem.id
             ? {
-                ...s,
-                symbol: stockForm.symbol,
-                shares: shares,
-                purchasePrice: purchasePrice,
-                currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
-                currency: stockForm.currency,
-              }
+              ...s,
+              symbol: stockForm.symbol,
+              shares: shares,
+              purchasePrice: purchasePrice,
+              currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
+              currency: stockForm.currency,
+            }
             : s
         ),
       });
@@ -114,11 +114,11 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
 
   const handleCryptoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Calculate amount if in money mode
     let amount: number;
     let purchasePrice = parseFloat(cryptoForm.purchasePrice);
-    
+
     if (cryptoForm.inputMode === 'money' && cryptoForm.moneyAmount && purchasePrice > 0) {
       const moneyAmount = parseFloat(cryptoForm.moneyAmount);
       // For crypto, preserve 8 decimal places (same as input step)
@@ -129,20 +129,20 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
       // Round to 8 decimal places for crypto
       amount = Math.round(amount * 100000000) / 100000000;
     }
-    
+
     if (editingItem && editingItem.type === 'crypto') {
       setData({
         ...data,
         crypto: data.crypto.map(c =>
           c.id === editingItem.id
             ? {
-                ...c,
-                symbol: cryptoForm.symbol.toUpperCase(),
-                amount: amount,
-                purchasePrice: purchasePrice,
-                currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
-                currency: cryptoForm.currency,
-              }
+              ...c,
+              symbol: cryptoForm.symbol.toUpperCase(),
+              amount: amount,
+              purchasePrice: purchasePrice,
+              currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
+              currency: cryptoForm.currency,
+            }
             : c
         ),
       });
@@ -168,13 +168,13 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         fixedIncome: data.fixedIncome.map(f =>
           f.id === editingItem.id
             ? {
-                ...f,
-                name: fixedForm.name,
-                amount: parseFloat(fixedForm.amount),
-                interestRate: parseFloat(fixedForm.interestRate),
-                maturityDate: fixedForm.maturityDate || undefined,
-                currency: fixedForm.currency,
-              }
+              ...f,
+              name: fixedForm.name,
+              amount: parseFloat(fixedForm.amount),
+              interestRate: parseFloat(fixedForm.interestRate),
+              maturityDate: fixedForm.maturityDate || undefined,
+              currency: fixedForm.currency,
+            }
             : f
         ),
       });
@@ -200,12 +200,12 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         variableInvestments: data.variableInvestments.map(v =>
           v.id === editingItem.id
             ? {
-                ...v,
-                name: variableForm.name,
-                amount: parseFloat(variableForm.amount),
-                currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
-                currency: variableForm.currency,
-              }
+              ...v,
+              name: variableForm.name,
+              amount: parseFloat(variableForm.amount),
+              currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
+              currency: variableForm.currency,
+            }
             : v
         ),
       });
@@ -288,37 +288,37 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
   useEffect(() => {
     const fetchPrices = async () => {
       if (data.stocks.length === 0 && data.crypto.length === 0) return;
-      
+
       setIsRefreshingPrices(true);
       const updatedData = { ...data };
-      
+
       // Fetch stock prices
       if (data.stocks.length > 0) {
         const stockSymbols = data.stocks.map(s => s.symbol);
         const stockPrices = await fetchStockPrices(stockSymbols);
-        
+
         updatedData.stocks = data.stocks.map(stock => ({
           ...stock,
           currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
         }));
       }
-      
+
       // Fetch crypto prices
       if (data.crypto.length > 0) {
         const cryptoSymbols = data.crypto.map(c => c.symbol);
         const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
-        
+
         updatedData.crypto = data.crypto.map(crypto => ({
           ...crypto,
           currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
         }));
       }
-      
+
       setData(updatedData);
       setIsRefreshingPrices(false);
       setPriceUpdateTime(new Date());
     };
-    
+
     fetchPrices();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run on mount
@@ -326,29 +326,29 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
   const handleRefreshPrices = async () => {
     setIsRefreshingPrices(true);
     const updatedData = { ...data };
-    
+
     // Fetch stock prices
     if (data.stocks.length > 0) {
       const stockSymbols = data.stocks.map(s => s.symbol);
       const stockPrices = await fetchStockPrices(stockSymbols);
-      
+
       updatedData.stocks = data.stocks.map(stock => ({
         ...stock,
         currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
       }));
     }
-    
+
     // Fetch crypto prices
     if (data.crypto.length > 0) {
       const cryptoSymbols = data.crypto.map(c => c.symbol);
       const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
-      
+
       updatedData.crypto = data.crypto.map(crypto => ({
         ...crypto,
         currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
       }));
     }
-    
+
     setData(updatedData);
     setIsRefreshingPrices(false);
     setPriceUpdateTime(new Date());
@@ -384,22 +384,20 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                 <button
                   type="button"
                   onClick={() => setStockForm({ ...stockForm, inputMode: 'shares', moneyAmount: '' })}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                    stockForm.inputMode === 'shares'
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'shares'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   By Shares
                 </button>
                 <button
                   type="button"
                   onClick={() => setStockForm({ ...stockForm, inputMode: 'money', shares: '' })}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                    stockForm.inputMode === 'money'
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'money'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   By Money Amount
                 </button>
@@ -520,22 +518,20 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                 <button
                   type="button"
                   onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'coins', moneyAmount: '' })}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                    cryptoForm.inputMode === 'coins'
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'coins'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   By Coins
                 </button>
                 <button
                   type="button"
                   onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'money', amount: '' })}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                    cryptoForm.inputMode === 'money'
+                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'money'
                       ? 'bg-blue-600 text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   By Money Amount
                 </button>
@@ -810,11 +806,10 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   setActiveTab(tab.id);
                   if (!showForm) setShowForm(false);
                 }}
-                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${
-                  activeTab === tab.id
+                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${activeTab === tab.id
                     ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Icon size={20} />
                 <span className="text-xs font-medium">{tab.label}</span>
@@ -869,7 +864,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         }, 0);
         const totalGainLoss = totalCurrentValue - totalInvested;
         const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
-        
+
         return (
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-2">
@@ -877,12 +872,12 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <TrendingUp size={20} className="text-blue-500" />
             </div>
             <div className="text-2xl font-bold text-blue-600 mb-2">
-              {formatCurrency(totalCurrentValue, baseCurrency)}
+              {formatCompactCurrency(totalCurrentValue, baseCurrency)}
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">Invested: {formatCurrency(totalInvested, baseCurrency)}</span>
+              <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
               <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss, baseCurrency)} 
+                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
                 ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
               </span>
             </div>
@@ -902,7 +897,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         }, 0);
         const totalGainLoss = totalCurrentValue - totalInvested;
         const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
-        
+
         return (
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-2">
@@ -910,12 +905,12 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <Coins size={20} className="text-purple-500" />
             </div>
             <div className="text-2xl font-bold text-purple-600 mb-2">
-              {formatCurrency(totalCurrentValue, baseCurrency)}
+              {formatCompactCurrency(totalCurrentValue, baseCurrency)}
             </div>
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">Invested: {formatCurrency(totalInvested, baseCurrency)}</span>
+              <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
               <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalGainLoss >= 0 ? '+' : ''}{formatCurrency(totalGainLoss, baseCurrency)} 
+                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
                 ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
               </span>
             </div>
@@ -927,7 +922,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         const totalValue = data.fixedIncome.reduce((sum, fixed) => {
           return sum + convertCurrency(fixed.amount, fixed.currency, baseCurrency);
         }, 0);
-        
+
         return (
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-2">
@@ -935,7 +930,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <DollarSign size={20} className="text-green-500" />
             </div>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(totalValue, baseCurrency)}
+              {formatCompactCurrency(totalValue, baseCurrency)}
             </div>
             <div className="text-sm text-gray-500 mt-1">
               {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
@@ -949,7 +944,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
           const value = inv.currentValue || inv.amount;
           return sum + convertCurrency(value, inv.currency, baseCurrency);
         }, 0);
-        
+
         return (
           <div className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-2">
@@ -957,7 +952,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <BarChart3 size={20} className="text-yellow-500" />
             </div>
             <div className="text-2xl font-bold text-yellow-600">
-              {formatCurrency(totalValue, baseCurrency)}
+              {formatCompactCurrency(totalValue, baseCurrency)}
             </div>
             <div className="text-sm text-gray-500 mt-1">
               {data.variableInvestments.length} investment{data.variableInvestments.length !== 1 ? 's' : ''}
@@ -986,16 +981,16 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   const purchaseValue = stock.purchasePrice * stock.shares;
                   const gainLoss = currentValue - purchaseValue;
                   const gainLossPercent = ((gainLoss / purchaseValue) * 100);
-                  
+
                   const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
                   const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
                   const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
-                  
+
                   return (
                     <div key={stock.id} className="p-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-semibold text-lg text-gray-800">{stock.symbol}</div>
+                        <div className="flex-1 min-w-0 mr-2">
+                          <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
                           <div className="text-sm text-gray-500 mt-1">
                             {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
                           </div>
@@ -1005,16 +1000,16 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                             </div>
                           )}
                           <div className="text-lg font-bold text-blue-600 mt-2">
-                            {formatCurrency(convertedCurrentValue, baseCurrency)}
+                            {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
                           </div>
                           {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
                             <div className="mt-2 space-y-1">
                               <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {gainLoss >= 0 ? '+' : ''}{formatCurrency(convertedGainLoss, baseCurrency)} 
+                                {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
                                 ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
                               </div>
                               <div className="text-xs text-gray-500">
-                                Invested: {formatCurrency(convertedPurchaseValue, baseCurrency)}
+                                Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
                               </div>
                             </div>
                           )}
@@ -1053,16 +1048,16 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   const purchaseValue = crypto.purchasePrice * crypto.amount;
                   const gainLoss = currentValue - purchaseValue;
                   const gainLossPercent = ((gainLoss / purchaseValue) * 100);
-                  
+
                   const convertedCurrentValue = convertCurrency(currentValue, crypto.currency, baseCurrency);
                   const convertedPurchaseValue = convertCurrency(purchaseValue, crypto.currency, baseCurrency);
                   const convertedGainLoss = convertCurrency(gainLoss, crypto.currency, baseCurrency);
-                  
+
                   return (
                     <div key={crypto.id} className="p-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-semibold text-lg text-gray-800">{crypto.symbol}</div>
+                        <div className="flex-1 min-w-0 mr-2">
+                          <div className="font-semibold text-lg text-gray-800 truncate">{crypto.symbol}</div>
                           <div className="text-sm text-gray-500 mt-1">
                             {crypto.amount.toFixed(8)} {crypto.symbol} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
                           </div>
@@ -1072,16 +1067,16 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                             </div>
                           )}
                           <div className="text-lg font-bold text-purple-600 mt-2">
-                            {formatCurrency(convertedCurrentValue, baseCurrency)}
+                            {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
                           </div>
                           {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
                             <div className="mt-2 space-y-1">
                               <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {gainLoss >= 0 ? '+' : ''}{formatCurrency(convertedGainLoss, baseCurrency)} 
+                                {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
                                 ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
                               </div>
                               <div className="text-xs text-gray-500">
-                                Invested: {formatCurrency(convertedPurchaseValue, baseCurrency)}
+                                Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
                               </div>
                             </div>
                           )}
@@ -1119,8 +1114,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   return (
                     <div key={fixed.id} className="p-4">
                       <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-semibold text-lg text-gray-800">{fixed.name}</div>
+                        <div className="flex-1 min-w-0 mr-2">
+                          <div className="font-semibold text-lg text-gray-800 truncate">{fixed.name}</div>
                           <div className="text-sm text-gray-500 mt-1">
                             Interest Rate: {fixed.interestRate}%
                           </div>
@@ -1130,7 +1125,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                             </div>
                           )}
                           <div className="text-lg font-bold text-green-600 mt-2">
-                            {formatCurrency(convertedValue, baseCurrency)}
+                            {formatCompactCurrency(convertedValue, baseCurrency)}
                           </div>
                         </div>
                         <div className="flex gap-2">
@@ -1166,8 +1161,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                 return (
                   <div key={inv.id} className="p-4">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-semibold text-lg text-gray-800">{inv.name}</div>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <div className="font-semibold text-lg text-gray-800 truncate">{inv.name}</div>
                         <div className="text-sm text-gray-500 mt-1">
                           Initial: {formatCurrency(inv.amount, inv.currency)}
                         </div>
@@ -1177,7 +1172,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                           </div>
                         )}
                         <div className="text-lg font-bold text-yellow-600 mt-2">
-                          {formatCurrency(convertedValue, baseCurrency)}
+                          {formatCompactCurrency(convertedValue, baseCurrency)}
                         </div>
                       </div>
                       <div className="flex gap-2">

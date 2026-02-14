@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
-import { formatCurrency, convertCurrency } from '../utils/currency';
+import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome } from '../utils/calculations';
 
 interface ExpensesProps {
@@ -559,8 +559,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                   }
                 }}
                 className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${viewMode === tab.id
-                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50'
                   }`}
               >
                 <Icon size={20} />
@@ -578,7 +578,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             <div>
               <div className="text-sm text-gray-600">Total Expenses</div>
               <div className="text-2xl font-bold text-red-600">
-                {formatCurrency(totalExpenses, baseCurrency)}
+                {formatCompactCurrency(totalExpenses, baseCurrency)}
               </div>
             </div>
             <div className="text-right">
@@ -609,13 +609,13 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             <div>
               <div className="text-sm text-gray-600">Total Income</div>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(totalIncome, baseCurrency)}
+                {formatCompactCurrency(totalIncome, baseCurrency)}
               </div>
             </div>
             <div className="text-right">
               <div className="text-sm text-gray-600">Monthly Income</div>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(monthlyIncome, baseCurrency)}
+                {formatCompactCurrency(monthlyIncome, baseCurrency)}
               </div>
             </div>
           </div>
@@ -628,7 +628,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             <div>
               <div className="text-sm text-gray-600">Active Recurring Income</div>
               <div className="text-2xl font-bold text-green-600">
-                {formatCurrency(
+                {formatCompactCurrency(
                   data.recurringIncomes
                     .filter(r => r.isActive)
                     .reduce((sum, r) => sum + convertCurrency(r.amount, r.currency, baseCurrency), 0),
@@ -687,8 +687,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 .map(expense => (
                   <div key={expense.id} className="p-4">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800">{expense.description}</div>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <div className="font-medium text-gray-800 truncate">{expense.description}</div>
                         <div className="text-sm text-gray-500 mt-1">
                           {expense.category} • {new Date(expense.date).toLocaleDateString()}
                         </div>
@@ -739,8 +739,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 .map(income => (
                   <div key={income.id} className="p-4">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-800">{income.description}</div>
+                      <div className="flex-1 min-w-0 mr-2">
+                        <div className="font-medium text-gray-800 truncate">{income.description}</div>
                         <div className="text-sm text-gray-500 mt-1">
                           {income.category} • {new Date(income.date).toLocaleDateString()}
                         </div>
@@ -811,8 +811,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                         <button
                           onClick={() => toggleRecurringActive(recurring.id)}
                           className={`p-2 rounded-lg ${recurring.isActive
-                              ? 'text-orange-600 hover:bg-orange-50'
-                              : 'text-green-600 hover:bg-green-50'
+                            ? 'text-orange-600 hover:bg-orange-50'
+                            : 'text-green-600 hover:bg-green-50'
                             }`}
                           title={recurring.isActive ? 'Deactivate' : 'Activate'}
                         >
