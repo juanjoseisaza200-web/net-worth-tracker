@@ -237,7 +237,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         currentPrice: s.currentPrice?.toString() || '',
         currency: s.currency,
         inputMode: 'shares',
-        moneyAmount: '',
+        moneyAmount: (s.shares * s.purchasePrice).toFixed(2),
       });
     } else if (type === 'crypto') {
       const c = item as Crypto;
@@ -248,7 +248,7 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         currentPrice: c.currentPrice?.toString() || '',
         currency: c.currency,
         inputMode: 'coins',
-        moneyAmount: '',
+        moneyAmount: (c.amount * c.purchasePrice).toFixed(2),
       });
     } else if (type === 'fixed') {
       const f = item as FixedIncome;
@@ -387,7 +387,18 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setStockForm({ ...stockForm, inputMode: 'shares', moneyAmount: '' })}
+                  onClick={() => {
+                    // Switch to shares mode: calculate shares from moneyAmount if possible
+                    let newShares = stockForm.shares;
+                    if (stockForm.moneyAmount && stockForm.purchasePrice) {
+                      const money = parseFloat(stockForm.moneyAmount);
+                      const price = parseFloat(stockForm.purchasePrice);
+                      if (price > 0) {
+                        newShares = (money / price).toFixed(2);
+                      }
+                    }
+                    setStockForm({ ...stockForm, inputMode: 'shares', shares: newShares });
+                  }}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'shares'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -397,7 +408,18 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStockForm({ ...stockForm, inputMode: 'money', shares: '' })}
+                  onClick={() => {
+                    // Switch to money mode: calculate moneyAmount from shares if possible
+                    let newMoneyAmount = stockForm.moneyAmount;
+                    if (stockForm.shares && stockForm.purchasePrice) {
+                      const shares = parseFloat(stockForm.shares);
+                      const price = parseFloat(stockForm.purchasePrice);
+                      if (price > 0) {
+                        newMoneyAmount = (shares * price).toFixed(2);
+                      }
+                    }
+                    setStockForm({ ...stockForm, inputMode: 'money', moneyAmount: newMoneyAmount });
+                  }}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'money'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -521,7 +543,18 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'coins', moneyAmount: '' })}
+                  onClick={() => {
+                    // Switch to coins mode: calculate amount from moneyAmount if possible
+                    let newAmount = cryptoForm.amount;
+                    if (cryptoForm.moneyAmount && cryptoForm.purchasePrice) {
+                      const money = parseFloat(cryptoForm.moneyAmount);
+                      const price = parseFloat(cryptoForm.purchasePrice);
+                      if (price > 0) {
+                        newAmount = (money / price).toFixed(8);
+                      }
+                    }
+                    setCryptoForm({ ...cryptoForm, inputMode: 'coins', amount: newAmount });
+                  }}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'coins'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -531,7 +564,18 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'money', amount: '' })}
+                  onClick={() => {
+                    // Switch to money mode: calculate moneyAmount from amount if possible
+                    let newMoneyAmount = cryptoForm.moneyAmount;
+                    if (cryptoForm.amount && cryptoForm.purchasePrice) {
+                      const amt = parseFloat(cryptoForm.amount);
+                      const price = parseFloat(cryptoForm.purchasePrice);
+                      if (price > 0) {
+                        newMoneyAmount = (amt * price).toFixed(2);
+                      }
+                    }
+                    setCryptoForm({ ...cryptoForm, inputMode: 'money', moneyAmount: newMoneyAmount });
+                  }}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'money'
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
