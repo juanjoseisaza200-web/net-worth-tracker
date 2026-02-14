@@ -73,5 +73,8 @@ export interface AppData {
   fixedIncome: FixedIncome[];
   variableInvestments: VariableInvestment[];
   baseCurrency: Currency;
+  settings?: {
+    autoUpdatePrices: boolean;
+  };
 }
 

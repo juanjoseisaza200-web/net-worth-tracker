@@ -11,6 +11,9 @@ const defaultData: AppData = {
   fixedIncome: [],
   variableInvestments: [],
   baseCurrency: 'USD',
+  settings: {
+    autoUpdatePrices: true,
+  },
 };
 
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';

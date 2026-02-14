@@ -1,16 +1,30 @@
 import { User } from 'firebase/auth';
-import { LogOut, RefreshCw, User as UserIcon, ArrowLeft } from 'lucide-react';
+import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { AppData } from '../types';
 
 interface SettingsProps {
     user: User;
     onLogout: () => void;
     onSync: () => Promise<void>;
+    data: AppData;
+    setData: (data: AppData) => void;
 }
 
-export default function Settings({ user, onLogout, onSync }: SettingsProps) {
+export default function Settings({ user, onLogout, onSync, data, setData }: SettingsProps) {
     const [syncing, setSyncing] = useState(false);
+    const autoUpdatePrices = data.settings?.autoUpdatePrices ?? true;
+
+    const toggleAutoUpdate = () => {
+        setData({
+            ...data,
+            settings: {
+                ...data.settings,
+                autoUpdatePrices: !autoUpdatePrices,
+            },
+        });
+    };
 
     const handleSync = async () => {
         setSyncing(true);
@@ -47,6 +61,24 @@ export default function Settings({ user, onLogout, onSync }: SettingsProps) {
 
                 {/* Actions Section */}
                 <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+                    <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${autoUpdatePrices ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                {autoUpdatePrices ? <RefreshCw size={20} /> : <RefreshCwOff size={20} />}
+                            </div>
+                            <div className="text-left">
+                                <span className="block font-medium text-gray-900">Auto-update Prices</span>
+                                <span className="block text-xs text-gray-500">Fetch live stock/crypto prices</span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={toggleAutoUpdate}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${autoUpdatePrices ? 'bg-blue-600' : 'bg-gray-200'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoUpdatePrices ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </div>
+
                     <button
                         onClick={handleSync}
                         disabled={syncing}

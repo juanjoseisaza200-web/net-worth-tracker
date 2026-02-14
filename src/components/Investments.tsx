@@ -287,6 +287,10 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
   // Auto-fetch prices on mount
   useEffect(() => {
     const fetchPrices = async () => {
+      // Check if auto-update is enabled (default to true if undefined)
+      const autoUpdate = data.settings?.autoUpdatePrices ?? true;
+      if (!autoUpdate) return;
+
       if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
       setIsRefreshingPrices(true);
@@ -385,8 +389,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   type="button"
                   onClick={() => setStockForm({ ...stockForm, inputMode: 'shares', moneyAmount: '' })}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'shares'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
                   By Shares
@@ -395,8 +399,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   type="button"
                   onClick={() => setStockForm({ ...stockForm, inputMode: 'money', shares: '' })}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'money'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
                   By Money Amount
@@ -519,8 +523,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   type="button"
                   onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'coins', moneyAmount: '' })}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'coins'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
                   By Coins
@@ -529,8 +533,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   type="button"
                   onClick={() => setCryptoForm({ ...cryptoForm, inputMode: 'money', amount: '' })}
                   className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'money'
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                 >
                   By Money Amount
@@ -807,8 +811,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
                   if (!showForm) setShowForm(false);
                 }}
                 className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50'
+                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                  : 'text-gray-600 hover:bg-gray-50'
                   }`}
               >
                 <Icon size={20} />
@@ -834,16 +838,18 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
       {renderForm()}
 
       {/* Refresh Prices Button */}
-      {(activeTab === 'stock' || activeTab === 'crypto') && (data.stocks.length > 0 || data.crypto.length > 0) && (
-        <button
-          onClick={handleRefreshPrices}
-          disabled={isRefreshingPrices}
-          className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <RefreshCw size={18} className={isRefreshingPrices ? 'animate-spin' : ''} />
-          {isRefreshingPrices ? 'Updating Prices...' : 'Refresh Prices'}
-        </button>
-      )}
+      {(activeTab === 'stock' || activeTab === 'crypto') &&
+        (data.stocks.length > 0 || data.crypto.length > 0) &&
+        (data.settings?.autoUpdatePrices ?? true) && (
+          <button
+            onClick={handleRefreshPrices}
+            disabled={isRefreshingPrices}
+            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw size={18} className={isRefreshingPrices ? 'animate-spin' : ''} />
+            {isRefreshingPrices ? 'Updating Prices...' : 'Refresh Prices'}
+          </button>
+        )}
 
       {priceUpdateTime && (
         <div className="text-xs text-gray-500 text-center">
