@@ -304,7 +304,6 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
                   lang="en-US"
                   required
                   value={expenseForm.amount}
@@ -392,7 +391,6 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
                   lang="en-US"
                   required
                   value={incomeForm.amount}

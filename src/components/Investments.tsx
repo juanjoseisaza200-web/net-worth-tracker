@@ -449,7 +449,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    pattern="[0-9]*"
+                    
                     lang="en-US"
                     required
                     value={stockForm.shares}
@@ -469,7 +469,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    pattern="[0-9]*"
+                    
                     lang="en-US"
                     required
                     value={stockForm.moneyAmount}
@@ -508,7 +508,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   required
                   value={stockForm.purchasePrice}
@@ -527,7 +527,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   value={stockForm.currentPrice}
                   onChange={(e) => {
@@ -629,7 +629,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    pattern="[0-9]*"
+                    
                     lang="en-US"
                     required
                     value={cryptoForm.amount}
@@ -649,7 +649,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    pattern="[0-9]*"
+                    
                     lang="en-US"
                     required
                     value={cryptoForm.moneyAmount}
@@ -688,7 +688,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   required
                   value={cryptoForm.purchasePrice}
@@ -707,7 +707,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   value={cryptoForm.currentPrice}
                   onChange={(e) => {
@@ -757,7 +757,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   required
                   value={fixedForm.amount}
@@ -787,7 +787,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+                  
                   lang="en-US"
                   required
                   value={fixedForm.interestRate}
@@ -846,7 +846,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <input
                 type="text"
                 inputMode="decimal"
-                pattern="[0-9]*"
+                
                 lang="en-US"
                 required
                 value={variableForm.amount}
@@ -875,7 +875,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             <input
               type="text"
               inputMode="decimal"
-              pattern="[0-9]*"
+              
               lang="en-US"
               value={variableForm.currentValue}
               onChange={(e) => {
