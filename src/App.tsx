@@ -64,13 +64,20 @@ function App() {
     };
   }, []); // Only run on mount, but depends on load functions
 
-  // Save to cloud whenever data changes
-  useEffect(() => {
+  // Explicit save handler - passed to components to trigger cloud saves on USER ACTION only
+  const handleSaveData = (newData: AppData) => {
+    setData(newData);
+    // Save to local storage
+    saveData(newData);
+
+    // Save to cloud if user is logged in
     if (user) {
-      saveDataToCloud(user.uid, data);
+      saveDataToCloud(user.uid, newData);
     }
-    saveData(data); // Keep local backup
-  }, [data, user]);
+  };
+
+  // Removed auto-save useEffect to prevent overwriting cloud data on initialization
+  // useEffect(() => { ... }, [data, user]); 
 
   useEffect(() => {
     updateBaseCurrency(baseCurrency);
@@ -79,8 +86,7 @@ function App() {
   const handleCurrencyChange = (currency: Currency) => {
     setBaseCurrency(currency);
     const newData = { ...data, baseCurrency: currency };
-    setData(newData);
-    // Cloud save handled by useEffect
+    handleSaveData(newData);
   };
 
   const handleManualSync = async () => {
@@ -127,9 +133,9 @@ function App() {
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>
             <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/investments" element={<Investments data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
-            <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={setData} />} />
+            <Route path="/expenses" element={<Expenses data={data} setData={handleSaveData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleSaveData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
+            <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleSaveData} />} />
           </Routes>
         </main>
         <Navigation />
