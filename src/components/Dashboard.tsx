@@ -124,8 +124,8 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                     <div className="text-sm text-gray-500">{expense.category}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-semibold text-red-600 truncate max-w-[100px]">
-                      {formatCurrency(expense.amount, expense.currency)}
+                    <div className="font-semibold text-red-600 truncate max-w-[120px]">
+                      {formatAdaptiveCurrency(expense.amount, expense.currency)}
                     </div>
                     <div className="text-xs text-gray-500">
                       {formatDateForDisplay(expense.date)}
