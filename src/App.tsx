@@ -95,6 +95,13 @@ function App() {
     }
   };
 
+  // Local update handler - updates UI and local storage BUT NOT Cloud
+  // Use this for background tasks like auto-refreshing prices to avoid overwriting cloud data with stale local state
+  const handleLocalDataUpdate = (newData: AppData) => {
+    setData(newData);
+    saveData(newData);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
@@ -134,7 +141,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/expenses" element={<Expenses data={data} setData={handleSaveData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/investments" element={<Investments data={data} setData={handleSaveData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleSaveData} saveLocalData={handleLocalDataUpdate} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleSaveData} />} />
           </Routes>
         </main>

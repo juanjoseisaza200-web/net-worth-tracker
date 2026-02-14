@@ -11,6 +11,7 @@ import { fetchStockPrices, fetchCryptoPrices } from '../utils/priceFetcher';
 interface InvestmentsProps {
   data: AppData;
   setData: (data: AppData) => void;
+  saveLocalData: (data: AppData) => void;
   baseCurrency: Currency;
   onCurrencyChange: (currency: Currency) => void;
   user: User | null;
@@ -19,7 +20,7 @@ interface InvestmentsProps {
 const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
 type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
 
-export default function Investments({ data, setData, baseCurrency, onCurrencyChange, user }: InvestmentsProps) {
+export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange, user }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
@@ -336,7 +337,9 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
       }
 
       if (hasUpdates) {
-        setData(updatedData);
+        // IMPORTANT: Use saveLocalData (local only) instead of setData (cloud save)
+        // This prevents overwriting cloud data with stale local data while prices are updating
+        saveLocalData(updatedData);
         setPriceUpdateTime(new Date());
       }
       setIsRefreshingPrices(false);
