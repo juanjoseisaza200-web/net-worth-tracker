@@ -1,5 +1,4 @@
 import { AppData, Currency } from '../types';
-import { fetchStockPrices, fetchCryptoPrices } from './priceFetcher';
 
 const STORAGE_KEY = 'net-worth-tracker-data';
 

@@ -7,7 +7,6 @@ import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices } from '../utils/priceFetcher';
-import { refreshInvestmentPrices } from '../utils/storage';
 
 interface InvestmentsProps {
   data: AppData;
@@ -287,27 +286,36 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
     }
   };
 
-  // Auto-fetch prices on mount
+  // Auto-refresh prices every 60 seconds (only if visible)
   useEffect(() => {
-    const fetchPrices = async () => {
-      // Check if auto-update is enabled (default to true if undefined)
+    const refreshPrices = async () => {
+      // 1. Visibility Guard: Don't run if tab is hidden to prevent overwriting with stale state
+      if (document.hidden) return;
+
+      // 2. Settings Check: Only run if auto-update is enabled
       const autoUpdate = data.settings?.autoUpdatePrices ?? true;
       if (!autoUpdate) return;
 
       if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
+      // 3. Local-First Update: Refresh prices for the CURRENTLY DISPLAYED list
+      // This preserves any new items (like "Stock 7") that haven't synced to cloud yet.
       setIsRefreshingPrices(true);
       const updatedData = { ...data };
+      let hasUpdates = false;
 
       // Fetch stock prices
       if (data.stocks.length > 0) {
         const stockSymbols = data.stocks.map(s => s.symbol);
         const stockPrices = await fetchStockPrices(stockSymbols);
 
-        updatedData.stocks = data.stocks.map(stock => ({
-          ...stock,
-          currentPrice: stockPrices[stock.symbol] || stock.currentPrice,
-        }));
+        updatedData.stocks = data.stocks.map(stock => {
+          if (stockPrices[stock.symbol] && stockPrices[stock.symbol] !== stock.currentPrice) {
+            hasUpdates = true;
+            return { ...stock, currentPrice: stockPrices[stock.symbol] };
+          }
+          return stock;
+        });
       }
 
       // Fetch crypto prices
@@ -315,37 +323,32 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
         const cryptoSymbols = data.crypto.map(c => c.symbol);
         const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
 
-        updatedData.crypto = data.crypto.map(crypto => ({
-          ...crypto,
-          currentPrice: cryptoPrices[crypto.symbol] || crypto.currentPrice,
-        }));
+        updatedData.crypto = data.crypto.map(crypto => {
+          if (cryptoPrices[crypto.symbol] && cryptoPrices[crypto.symbol] !== crypto.currentPrice) {
+            hasUpdates = true;
+            return { ...crypto, currentPrice: cryptoPrices[crypto.symbol] };
+          }
+          return crypto;
+        });
       }
 
-      setData(updatedData);
+      if (hasUpdates) {
+        setData(updatedData);
+        setPriceUpdateTime(new Date());
+      }
       setIsRefreshingPrices(false);
-      setPriceUpdateTime(new Date());
     };
 
-    fetchPrices();
+    // Initial fetch
+    refreshPrices();
+
+    // Set interval
+    const intervalId = setInterval(refreshPrices, 60000);
+
+    return () => clearInterval(intervalId);
+    // Dependencies: data changes should restart the timer to ensure we always refresh the *latest* list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only run on mount
-
-  const handleRefreshPrices = async () => {
-    if (!user) return; // Should be authenticated to use cloud function
-
-    setIsRefreshingPrices(true);
-    try {
-      await refreshInvestmentPrices(user.uid);
-      // We don't need to manually setData here because the onSnapshot listener in App.tsx 
-      // will automatically pick up the changes and update the UI.
-      setPriceUpdateTime(new Date());
-    } catch (error) {
-      console.error("Failed to refresh prices:", error);
-      alert("Failed to update prices. Please check your connection.");
-    } finally {
-      setIsRefreshingPrices(false);
-    }
-  };
+  }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]); // Re-run if list changes
 
   const renderForm = () => {
     if (!showForm) return null;
@@ -870,19 +873,8 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
       {/* Form */}
       {renderForm()}
 
-      {/* Refresh Prices Button */}
-      {(activeTab === 'stock' || activeTab === 'crypto') &&
-        (data.stocks.length > 0 || data.crypto.length > 0) &&
-        (data.settings?.autoUpdatePrices ?? true) && (
-          <button
-            onClick={handleRefreshPrices}
-            disabled={isRefreshingPrices}
-            className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <RefreshCw size={18} className={isRefreshingPrices ? 'animate-spin' : ''} />
-            {isRefreshingPrices ? 'Updating Prices...' : 'Refresh Prices'}
-          </button>
-        )}
+      {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
+
 
       {priceUpdateTime && (
         <div className="text-xs text-gray-500 text-center">
