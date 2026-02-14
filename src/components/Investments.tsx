@@ -449,10 +449,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
+                    pattern="[0-9]*"
+                    lang="en-US"
                     required
                     value={stockForm.shares}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const val = e.target.value.replace(',', '.');
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         setStockForm({ ...stockForm, shares: val });
                       }
@@ -467,10 +469,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
+                    pattern="[0-9]*"
+                    lang="en-US"
                     required
                     value={stockForm.moneyAmount}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const val = e.target.value.replace(',', '.');
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         setStockForm({ ...stockForm, moneyAmount: val });
                       }
@@ -504,10 +508,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={stockForm.purchasePrice}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setStockForm({ ...stockForm, purchasePrice: val });
                     }
@@ -521,9 +527,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   value={stockForm.currentPrice}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setStockForm({ ...stockForm, currentPrice: val });
                     }
@@ -621,10 +629,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
+                    pattern="[0-9]*"
+                    lang="en-US"
                     required
                     value={cryptoForm.amount}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const val = e.target.value.replace(',', '.');
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         setCryptoForm({ ...cryptoForm, amount: val });
                       }
@@ -639,10 +649,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
+                    pattern="[0-9]*"
+                    lang="en-US"
                     required
                     value={cryptoForm.moneyAmount}
                     onChange={(e) => {
-                      const val = e.target.value;
+                      const val = e.target.value.replace(',', '.');
                       if (val === '' || /^\d*\.?\d*$/.test(val)) {
                         setCryptoForm({ ...cryptoForm, moneyAmount: val });
                       }
@@ -676,10 +688,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={cryptoForm.purchasePrice}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setCryptoForm({ ...cryptoForm, purchasePrice: val });
                     }
@@ -693,9 +707,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   value={cryptoForm.currentPrice}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setCryptoForm({ ...cryptoForm, currentPrice: val });
                     }
@@ -741,10 +757,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={fixedForm.amount}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setFixedForm({ ...fixedForm, amount: val });
                     }
@@ -769,10 +787,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={fixedForm.interestRate}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setFixedForm({ ...fixedForm, interestRate: val });
                     }
@@ -826,10 +846,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <input
                 type="text"
                 inputMode="decimal"
+                pattern="[0-9]*"
+                lang="en-US"
                 required
                 value={variableForm.amount}
                 onChange={(e) => {
-                  const val = e.target.value;
+                  const val = e.target.value.replace(',', '.');
                   if (val === '' || /^\d*\.?\d*$/.test(val)) {
                     setVariableForm({ ...variableForm, amount: val });
                   }
@@ -853,9 +875,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             <input
               type="text"
               inputMode="decimal"
+              pattern="[0-9]*"
+              lang="en-US"
               value={variableForm.currentValue}
               onChange={(e) => {
-                const val = e.target.value;
+                const val = e.target.value.replace(',', '.');
                 if (val === '' || /^\d*\.?\d*$/.test(val)) {
                   setVariableForm({ ...variableForm, currentValue: val });
                 }

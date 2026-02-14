@@ -304,10 +304,12 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={expenseForm.amount}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setExpenseForm({ ...expenseForm, amount: val });
                     }
@@ -390,10 +392,12 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <input
                   type="text"
                   inputMode="decimal"
+                  pattern="[0-9]*"
+                  lang="en-US"
                   required
                   value={incomeForm.amount}
                   onChange={(e) => {
-                    const val = e.target.value;
+                    const val = e.target.value.replace(',', '.');
                     if (val === '' || /^\d*\.?\d*$/.test(val)) {
                       setIncomeForm({ ...incomeForm, amount: val });
                     }
