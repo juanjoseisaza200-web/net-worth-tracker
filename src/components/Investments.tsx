@@ -447,13 +447,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Shares</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     required
-                    step="0.01"
-                    min="0"
                     value={stockForm.shares}
-                    onChange={(e) => setStockForm({ ...stockForm, shares: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setStockForm({ ...stockForm, shares: val });
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0.4"
                   />
@@ -462,13 +465,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     required
-                    step="0.01"
-                    min="0"
                     value={stockForm.moneyAmount}
-                    onChange={(e) => setStockForm({ ...stockForm, moneyAmount: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setStockForm({ ...stockForm, moneyAmount: val });
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="30.00"
                   />
@@ -496,13 +502,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   Purchase Price {stockForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   required
-                  step="0.01"
-                  min="0"
                   value={stockForm.purchasePrice}
-                  onChange={(e) => setStockForm({ ...stockForm, purchasePrice: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setStockForm({ ...stockForm, purchasePrice: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Price per share"
                 />
@@ -510,12 +519,15 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0"
                   value={stockForm.currentPrice}
-                  onChange={(e) => setStockForm({ ...stockForm, currentPrice: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setStockForm({ ...stockForm, currentPrice: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -607,13 +619,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (Coins)</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     required
-                    step="0.00000001"
-                    min="0"
                     value={cryptoForm.amount}
-                    onChange={(e) => setCryptoForm({ ...cryptoForm, amount: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setCryptoForm({ ...cryptoForm, amount: val });
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="0.5"
                   />
@@ -622,13 +637,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     required
-                    step="0.01"
-                    min="0"
                     value={cryptoForm.moneyAmount}
-                    onChange={(e) => setCryptoForm({ ...cryptoForm, moneyAmount: e.target.value })}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                        setCryptoForm({ ...cryptoForm, moneyAmount: val });
+                      }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     placeholder="30.00"
                   />
@@ -656,13 +674,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   Purchase Price {cryptoForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
                 </label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   required
-                  step="0.01"
-                  min="0"
                   value={cryptoForm.purchasePrice}
-                  onChange={(e) => setCryptoForm({ ...cryptoForm, purchasePrice: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setCryptoForm({ ...cryptoForm, purchasePrice: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                   placeholder="Price per coin"
                 />
@@ -670,12 +691,15 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step="0.01"
-                  min="0"
                   value={cryptoForm.currentPrice}
-                  onChange={(e) => setCryptoForm({ ...cryptoForm, currentPrice: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setCryptoForm({ ...cryptoForm, currentPrice: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -715,13 +739,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   required
-                  step="0.01"
-                  min="0"
                   value={fixedForm.amount}
-                  onChange={(e) => setFixedForm({ ...fixedForm, amount: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setFixedForm({ ...fixedForm, amount: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -740,13 +767,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
                   required
-                  step="0.01"
-                  min="0"
                   value={fixedForm.interestRate}
-                  onChange={(e) => setFixedForm({ ...fixedForm, interestRate: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                      setFixedForm({ ...fixedForm, interestRate: val });
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
@@ -794,13 +824,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Initial Amount</label>
               <input
-                type="number"
+                type="text"
                 inputMode="decimal"
                 required
-                step="0.01"
-                min="0"
                 value={variableForm.amount}
-                onChange={(e) => setVariableForm({ ...variableForm, amount: e.target.value })}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                    setVariableForm({ ...variableForm, amount: val });
+                  }
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -818,12 +851,15 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Current Value (optional)</label>
             <input
-              type="number"
+              type="text"
               inputMode="decimal"
-              step="0.01"
-              min="0"
               value={variableForm.currentValue}
-              onChange={(e) => setVariableForm({ ...variableForm, currentValue: e.target.value })}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                  setVariableForm({ ...variableForm, currentValue: val });
+                }
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg"
             />
           </div>
