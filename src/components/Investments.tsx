@@ -79,9 +79,12 @@ export default function Investments({ data, setData, baseCurrency, onCurrencyCha
 
     if (stockForm.inputMode === 'money' && stockForm.moneyAmount && purchasePrice > 0) {
       const moneyAmount = parseFloat(stockForm.moneyAmount);
-      shares = Math.round((moneyAmount / purchasePrice) * 100) / 100; // Round to 2 decimal places
+      // Increase precision to 8 decimal places to preserve exact monetary value
+      shares = Math.round((moneyAmount / purchasePrice) * 100000000) / 100000000;
     } else {
-      shares = Math.round(shares * 100) / 100; // Round to 2 decimal places
+      // Also allow higher precision for direct share input if needed, or keep it standard. 
+      // Let's use 8 decimals here too to be consistent and allow fractional shares.
+      shares = Math.round(shares * 100000000) / 100000000;
     }
 
     if (editingItem && editingItem.type === 'stock') {
