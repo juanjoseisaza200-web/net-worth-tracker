@@ -26,7 +26,7 @@ function App() {
       <div className="min-h-screen bg-gray-50 pb-20">
         <Routes>
           <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-          <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} />} />
+          <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
           <Route path="/investments" element={<Investments data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
         </Routes>
         <Navigation />
@@ -54,9 +54,8 @@ function Navigation() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full ${
-                isActive ? 'text-blue-600' : 'text-gray-500'
-              }`}
+              className={`flex flex-col items-center justify-center flex-1 h-full ${isActive ? 'text-blue-600' : 'text-gray-500'
+                }`}
             >
               <Icon size={24} />
               <span className="text-xs mt-1">{item.label}</span>

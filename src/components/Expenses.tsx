@@ -8,20 +8,21 @@ interface ExpensesProps {
   data: AppData;
   setData: (data: AppData) => void;
   baseCurrency: Currency;
+  onCurrencyChange: (currency: Currency) => void;
 }
 
 const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
-const expenseCategories = ['Food','Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
+const expenseCategories = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
 const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';
 
-export default function Expenses({ data, setData, baseCurrency }: ExpensesProps) {
+export default function Expenses({ data, setData, baseCurrency, onCurrencyChange }: ExpensesProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('expenses');
   const [showForm, setShowForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<RecurringIncome | null>(null);
-  
+
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
     currency: 'USD' as Currency,
@@ -49,7 +50,7 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
 
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingExpense) {
       setData({
         ...data,
@@ -87,7 +88,7 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
 
   const handleIncomeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingIncome) {
       setData({
         ...data,
@@ -125,7 +126,7 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
 
   const handleRecurringSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (editingRecurring) {
       setData({
         ...data,
@@ -557,11 +558,10 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
                     resetForms();
                   }
                 }}
-                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${
-                  viewMode === tab.id
+                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${viewMode === tab.id
                     ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-600 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Icon size={20} />
                 <span className="text-xs font-medium">{tab.label}</span>
@@ -593,6 +593,18 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
 
       {viewMode === 'income' && (
         <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold text-gray-800">Income Overview</h2>
+            <select
+              value={baseCurrency}
+              onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
+            >
+              {currencies.map(currency => (
+                <option key={currency} value={currency}>{currency}</option>
+              ))}
+            </select>
+          </div>
           <div className="flex justify-between items-center">
             <div>
               <div className="text-sm text-gray-600">Total Income</div>
@@ -647,9 +659,8 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
               setEditingRecurring(null);
             }
           }}
-          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg ${
-            viewMode === 'expenses' ? 'bg-blue-600' : 'bg-green-600'
-          } text-white`}
+          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg ${viewMode === 'expenses' ? 'bg-blue-600' : 'bg-green-600'
+            } text-white`}
         >
           <Plus size={20} />
           Add {viewMode === 'expenses' ? 'Expense' : viewMode === 'income' ? 'Income' : 'Recurring Income'}
@@ -682,7 +693,7 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
                           {expense.category} • {new Date(expense.date).toLocaleDateString()}
                         </div>
                         <div className="text-sm text-gray-400 mt-1">
-                          {formatCurrency(expense.amount, expense.currency)} 
+                          {formatCurrency(expense.amount, expense.currency)}
                           {expense.currency !== baseCurrency && (
                             <span className="ml-1">
                               ({formatCurrency(convertCurrency(expense.amount, expense.currency, baseCurrency), baseCurrency)})
@@ -734,7 +745,7 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
                           {income.category} • {new Date(income.date).toLocaleDateString()}
                         </div>
                         <div className="text-sm text-green-600 font-semibold mt-1">
-                          {formatCurrency(income.amount, income.currency)} 
+                          {formatCurrency(income.amount, income.currency)}
                           {income.currency !== baseCurrency && (
                             <span className="ml-1 text-gray-400">
                               ({formatCurrency(convertCurrency(income.amount, income.currency, baseCurrency), baseCurrency)})
@@ -799,11 +810,10 @@ export default function Expenses({ data, setData, baseCurrency }: ExpensesProps)
                       <div className="flex gap-2">
                         <button
                           onClick={() => toggleRecurringActive(recurring.id)}
-                          className={`p-2 rounded-lg ${
-                            recurring.isActive
+                          className={`p-2 rounded-lg ${recurring.isActive
                               ? 'text-orange-600 hover:bg-orange-50'
                               : 'text-green-600 hover:bg-green-50'
-                          }`}
+                            }`}
                           title={recurring.isActive ? 'Deactivate' : 'Activate'}
                         >
                           {recurring.isActive ? '⏸' : '▶'}
