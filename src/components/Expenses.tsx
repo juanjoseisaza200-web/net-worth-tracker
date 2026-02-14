@@ -3,6 +3,7 @@ import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, DollarSign } f
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome } from '../utils/calculations';
+import { formatDateForDisplay } from '../utils/date';
 
 interface ExpensesProps {
   data: AppData;
@@ -690,7 +691,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                       <div className="flex-1 min-w-0 mr-2">
                         <div className="font-medium text-gray-800 truncate">{expense.description}</div>
                         <div className="text-sm text-gray-500 mt-1">
-                          {expense.category} • {new Date(expense.date).toLocaleDateString()}
+                          {expense.category} • {formatDateForDisplay(expense.date)}
                         </div>
                         <div className="text-sm text-gray-400 mt-1">
                           {formatCurrency(expense.amount, expense.currency)}
@@ -742,7 +743,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                       <div className="flex-1 min-w-0 mr-2">
                         <div className="font-medium text-gray-800 truncate">{income.description}</div>
                         <div className="text-sm text-gray-500 mt-1">
-                          {income.category} • {new Date(income.date).toLocaleDateString()}
+                          {income.category} • {formatDateForDisplay(income.date)}
                         </div>
                         <div className="text-sm text-green-600 font-semibold mt-1">
                           {formatCurrency(income.amount, income.currency)}

@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, DollarSign, PieChart } from 'lucide-react';
 import { AppData, Currency } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency } from '../utils/currency';
+import { formatDateForDisplay } from '../utils/date';
 
 interface DashboardProps {
   data: AppData;
@@ -127,7 +128,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                       {formatCurrency(expense.amount, expense.currency)}
                     </div>
                     <div className="text-xs text-gray-500">
-                      {new Date(expense.date).toLocaleDateString()}
+                      {formatDateForDisplay(expense.date)}
                     </div>
                   </div>
                 </div>
