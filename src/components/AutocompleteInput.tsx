@@ -33,7 +33,7 @@ export default function AutocompleteInput({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [error, setError] = useState<string | null>(null);
-  
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -71,7 +71,7 @@ export default function AutocompleteInput({
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value;
     onChange(newValue);
-    
+
     if (newValue.length >= minChars) {
       debouncedSearch(newValue);
     } else {
@@ -102,7 +102,7 @@ export default function AutocompleteInput({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < suggestions.length - 1 ? prev + 1 : prev
         );
         break;
@@ -172,6 +172,8 @@ export default function AutocompleteInput({
           placeholder={placeholder}
           className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           autoComplete="off"
+          autoCapitalize="characters"
+          inputMode="text"
         />
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
           {isLoading ? (
@@ -199,13 +201,10 @@ export default function AutocompleteInput({
                 key={`${suggestion.symbol}-${index}`}
                 type="button"
                 onClick={() => handleSelect(suggestion)}
-                className={`w-full text-left px-4 py-2 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${
-                  index === selectedIndex ? 'bg-blue-50' : ''
-                } ${
-                  index === 0 ? 'rounded-t-lg' : ''
-                } ${
-                  index === suggestions.length - 1 ? 'rounded-b-lg' : ''
-                }`}
+                className={`w-full text-left px-4 py-2 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${index === selectedIndex ? 'bg-blue-50' : ''
+                  } ${index === 0 ? 'rounded-t-lg' : ''
+                  } ${index === suggestions.length - 1 ? 'rounded-b-lg' : ''
+                  }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex-1">

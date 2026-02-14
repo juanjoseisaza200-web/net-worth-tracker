@@ -303,6 +303,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -385,6 +386,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -466,6 +468,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
               <input
                 type="number"
+                inputMode="decimal"
                 required
                 step="0.01"
                 min="0"

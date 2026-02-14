@@ -448,6 +448,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <label className="block text-sm font-medium text-gray-700 mb-1">Shares</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     required
                     step="0.01"
                     min="0"
@@ -462,6 +463,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     required
                     step="0.01"
                     min="0"
@@ -495,6 +497,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -508,6 +511,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={stockForm.currentPrice}
@@ -604,6 +608,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <label className="block text-sm font-medium text-gray-700 mb-1">Amount (Coins)</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     required
                     step="0.00000001"
                     min="0"
@@ -618,6 +623,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
                   <input
                     type="number"
+                    inputMode="decimal"
                     required
                     step="0.01"
                     min="0"
@@ -651,6 +657,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 </label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -664,6 +671,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   step="0.01"
                   min="0"
                   value={cryptoForm.currentPrice}
@@ -708,6 +716,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -732,6 +741,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
                 <input
                   type="number"
+                  inputMode="decimal"
                   required
                   step="0.01"
                   min="0"
@@ -785,6 +795,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <label className="block text-sm font-medium text-gray-700 mb-1">Initial Amount</label>
               <input
                 type="number"
+                inputMode="decimal"
                 required
                 step="0.01"
                 min="0"
@@ -808,6 +819,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             <label className="block text-sm font-medium text-gray-700 mb-1">Current Value (optional)</label>
             <input
               type="number"
+              inputMode="decimal"
               step="0.01"
               min="0"
               value={variableForm.currentValue}
