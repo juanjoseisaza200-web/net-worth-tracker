@@ -13,18 +13,17 @@ const defaultData: AppData = {
   baseCurrency: 'USD',
 };
 
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from '../firebase';
+
 export const loadData = (): AppData => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
       // Migrate old data to include new fields
-      if (!data.incomes) {
-        data.incomes = [];
-      }
-      if (!data.recurringIncomes) {
-        data.recurringIncomes = [];
-      }
+      if (!data.incomes) data.incomes = [];
+      if (!data.recurringIncomes) data.recurringIncomes = [];
       return data;
     }
   } catch (error) {
@@ -38,6 +37,32 @@ export const saveData = (data: AppData): void => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch (error) {
     console.error('Error saving data:', error);
+  }
+};
+
+export const loadDataFromCloud = async (userId: string): Promise<AppData | null> => {
+  try {
+    const docRef = doc(db, "users", userId);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data() as AppData;
+      // Ensure fields exist
+      if (!data.incomes) data.incomes = [];
+      if (!data.recurringIncomes) data.recurringIncomes = [];
+      return data;
+    }
+  } catch (error) {
+    console.error("Error loading data from cloud:", error);
+  }
+  return null;
+};
+
+export const saveDataToCloud = async (userId: string, data: AppData): Promise<void> => {
+  try {
+    await setDoc(doc(db, "users", userId), data);
+  } catch (error) {
+    console.error("Error saving data to cloud:", error);
   }
 };
 

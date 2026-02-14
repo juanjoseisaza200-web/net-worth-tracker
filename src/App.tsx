@@ -5,30 +5,91 @@ import Dashboard from './components/Dashboard';
 import Expenses from './components/Expenses';
 import Investments from './components/Investments';
 import { AppData, Currency } from './types';
-import { loadData, saveData, updateBaseCurrency } from './utils/storage';
+import { loadData, saveData, updateBaseCurrency, loadDataFromCloud, saveDataToCloud } from './utils/storage';
+import { auth } from './firebase';
+import { onAuthStateChanged, User, signOut } from 'firebase/auth';
+import Login from './components/Login';
+import { LogOut } from 'lucide-react';
 
 function App() {
-  const [data, setData] = useState<AppData>(loadData());
+  const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
   const [baseCurrency, setBaseCurrency] = useState<Currency>(data.baseCurrency);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    saveData(data);
-  }, [data]);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        // Load cloud data on login
+        const cloudData = await loadDataFromCloud(currentUser.uid);
+        if (cloudData) {
+          setData(cloudData);
+          setBaseCurrency(cloudData.baseCurrency);
+        } else {
+          // If no cloud data, upload current local data? Or start fresh?
+          // Let's upload local data to bootstrap the account
+          await saveDataToCloud(currentUser.uid, data);
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []); // Only run on mount, but depends on load functions
+
+  // Save to cloud whenever data changes
+  useEffect(() => {
+    if (user) {
+      saveDataToCloud(user.uid, data);
+    }
+    saveData(data); // Keep local backup
+  }, [data, user]);
+
+  useEffect(() => {
+    updateBaseCurrency(baseCurrency);
+  }, [baseCurrency]);
 
   const handleCurrencyChange = (currency: Currency) => {
     setBaseCurrency(currency);
-    updateBaseCurrency(currency);
-    setData(prev => ({ ...prev, baseCurrency: currency }));
+    const newData = { ...data, baseCurrency: currency };
+    setData(newData);
+    // Cloud save handled by useEffect
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   return (
     <Router>
       <div className="min-h-screen bg-gray-50 pb-20">
-        <Routes>
-          <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-          <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-          <Route path="/investments" element={<Investments data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-        </Routes>
+        {/* Sign Out Button (Floating top-right or just accessible) */}
+        <div className="fixed top-4 right-4 z-50">
+          <button
+            onClick={() => signOut(auth)}
+            className="bg-white p-2 rounded-full shadow-md text-gray-600 hover:text-red-600"
+            title="Sign Out"
+          >
+            <LogOut size={20} />
+          </button>
+        </div>
+
+        <main className="pb-24 max-w-md mx-auto relative">
+          <Routes>
+            <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/expenses" element={<Expenses data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/investments" element={<Investments data={data} setData={setData} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+          </Routes>
+        </main>
         <Navigation />
       </div>
     </Router>
