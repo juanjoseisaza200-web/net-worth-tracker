@@ -370,6 +370,32 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]); // Re-run if list changes
 
+  const renderEstimatedPnL = (sharesStr: string, purchasePriceStr: string, currentPriceStr: string) => {
+    const shares = parseFloat(sharesStr);
+    const purchasePrice = parseFloat(purchasePriceStr);
+    const currentPrice = parseFloat(currentPriceStr);
+
+    if (!shares || !purchasePrice || !currentPrice) return null;
+
+    const cost = shares * purchasePrice;
+    const value = shares * currentPrice;
+    const pnl = value - cost;
+    const pnlPercent = (pnl / cost) * 100;
+    const isPositive = pnl >= 0;
+
+    return (
+      <div className={`mt-2 text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'} flex items-center gap-1`}>
+        {isPositive ? <TrendingUp size={16} /> : <TrendingUp size={16} className="transform rotate-180" />}
+        <span>
+          {isPositive ? '+' : ''}{formatCurrency(pnl, stockForm.currency)} ({isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%)
+        </span>
+        <span className="text-gray-400 font-normal ml-1">
+          (Est. Value: {formatCurrency(value, stockForm.currency)})
+        </span>
+      </div>
+    );
+  };
+
   const renderForm = () => {
     if (!showForm) return null;
 
@@ -385,9 +411,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <AutocompleteInput
                 value={stockForm.symbol}
                 onChange={(value) => setStockForm({ ...stockForm, symbol: value })}
-                onSelect={(suggestion: Suggestion) => {
-                  setStockForm({ ...stockForm, symbol: suggestion.symbol });
-                }}
+                onSelect={handleStockSelect}
                 placeholder="Search for stock symbol (e.g., AAPL)"
                 fetchSuggestions={searchStockSymbols}
                 minChars={1}
@@ -449,7 +473,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    
+
                     lang="en-US"
                     required
                     value={stockForm.shares}
@@ -469,7 +493,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    
+
                     lang="en-US"
                     required
                     value={stockForm.moneyAmount}
@@ -508,7 +532,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+
                   lang="en-US"
                   required
                   value={stockForm.purchasePrice}
@@ -523,11 +547,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                  <span>Current Price (optional)</span>
+                  {isFetchingPrice && <span className="text-blue-600 animate-pulse text-xs">Fetching price...</span>}
+                </label>
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+
                   lang="en-US"
                   value={stockForm.currentPrice}
                   onChange={(e) => {
@@ -538,6 +565,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
+                {renderEstimatedPnL(stockForm.shares, stockForm.purchasePrice, stockForm.currentPrice)}
               </div>
             </div>
             <div className="flex gap-2">
@@ -565,9 +593,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <AutocompleteInput
                 value={cryptoForm.symbol}
                 onChange={(value) => setCryptoForm({ ...cryptoForm, symbol: value })}
-                onSelect={(suggestion: Suggestion) => {
-                  setCryptoForm({ ...cryptoForm, symbol: suggestion.symbol });
-                }}
+                onSelect={handleCryptoSelect}
                 placeholder="Search for crypto symbol (e.g., BTC)"
                 fetchSuggestions={searchCryptoSymbols}
                 minChars={1}
@@ -629,7 +655,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    
+
                     lang="en-US"
                     required
                     value={cryptoForm.amount}
@@ -649,7 +675,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   <input
                     type="text"
                     inputMode="decimal"
-                    
+
                     lang="en-US"
                     required
                     value={cryptoForm.moneyAmount}
@@ -688,7 +714,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+
                   lang="en-US"
                   required
                   value={cryptoForm.purchasePrice}
@@ -703,11 +729,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Price (optional)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                  <span>Current Price (optional)</span>
+                  {isFetchingPrice && <span className="text-blue-600 animate-pulse text-xs">Fetching price...</span>}
+                </label>
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+                  pattern="[0-9]*"
                   lang="en-US"
                   value={cryptoForm.currentPrice}
                   onChange={(e) => {
@@ -718,6 +747,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
+                {renderEstimatedPnL(cryptoForm.amount, cryptoForm.purchasePrice, cryptoForm.currentPrice)}
               </div>
             </div>
             <div className="flex gap-2">
@@ -757,7 +787,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+
                   lang="en-US"
                   required
                   value={fixedForm.amount}
@@ -787,7 +817,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  
+
                   lang="en-US"
                   required
                   value={fixedForm.interestRate}
@@ -846,7 +876,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               <input
                 type="text"
                 inputMode="decimal"
-                
+
                 lang="en-US"
                 required
                 value={variableForm.amount}
@@ -875,7 +905,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             <input
               type="text"
               inputMode="decimal"
-              
+
               lang="en-US"
               value={variableForm.currentValue}
               onChange={(e) => {
