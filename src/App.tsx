@@ -10,6 +10,7 @@ import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
 import { LogOut } from 'lucide-react';
+import Header from './components/Header';
 
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
@@ -78,6 +79,12 @@ function App() {
     // Cloud save handled by useEffect
   };
 
+  const handleManualSync = async () => {
+    if (user) {
+      await saveDataToCloud(user.uid, data);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
@@ -111,16 +118,7 @@ function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-50 pb-20">
-        {/* Sign Out Button (Floating top-right or just accessible) */}
-        <div className="fixed top-4 right-4 z-50">
-          <button
-            onClick={() => signOut(auth)}
-            className="bg-white p-2 rounded-full shadow-md text-gray-600 hover:text-red-600"
-            title="Sign Out"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
+        {user && <Header user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} />}
 
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>
