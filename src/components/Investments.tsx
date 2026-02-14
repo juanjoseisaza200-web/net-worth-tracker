@@ -292,18 +292,22 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   // Auto-refresh prices every 60 seconds (only if visible)
   useEffect(() => {
+    /* Fixed: Added cancellation flag (isCurrent) to prevent race conditions.
+       If data changes (e.g. from cloud sync) while fetching prices, this flag becomes false
+       and the stale update is abandoned, preventing UI reversion. */
+    let isCurrent = true;
+
     const refreshPrices = async () => {
-      // 1. Visibility Guard: Don't run if tab is hidden to prevent overwriting with stale state
+      // 1. Visibility Guard
       if (document.hidden) return;
 
-      // 2. Settings Check: Only run if auto-update is enabled
+      // 2. Settings Check
       const autoUpdate = data.settings?.autoUpdatePrices ?? true;
       if (!autoUpdate) return;
 
       if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
-      // 3. Local-First Update: Refresh prices for the CURRENTLY DISPLAYED list
-      // This preserves any new items (like "Stock 7") that haven't synced to cloud yet.
+      // 3. Local-First Update
       setIsRefreshingPrices(true);
       const updatedData = { ...data };
       let hasUpdates = false;
@@ -312,6 +316,9 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       if (data.stocks.length > 0) {
         const stockSymbols = data.stocks.map(s => s.symbol);
         const stockPrices = await fetchStockPrices(stockSymbols);
+
+        // CHECK CANCELLATION
+        if (!isCurrent) return;
 
         updatedData.stocks = data.stocks.map(stock => {
           if (stockPrices[stock.symbol] && stockPrices[stock.symbol] !== stock.currentPrice) {
@@ -327,6 +334,9 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         const cryptoSymbols = data.crypto.map(c => c.symbol);
         const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
 
+        // CHECK CANCELLATION
+        if (!isCurrent) return;
+
         updatedData.crypto = data.crypto.map(crypto => {
           if (cryptoPrices[crypto.symbol] && cryptoPrices[crypto.symbol] !== crypto.currentPrice) {
             hasUpdates = true;
@@ -336,13 +346,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         });
       }
 
-      if (hasUpdates) {
+      if (hasUpdates && isCurrent) {
         // IMPORTANT: Use saveLocalData (local only) instead of setData (cloud save)
-        // This prevents overwriting cloud data with stale local data while prices are updating
         saveLocalData(updatedData);
         setPriceUpdateTime(new Date());
       }
-      setIsRefreshingPrices(false);
+      if (isCurrent) {
+        setIsRefreshingPrices(false);
+      }
     };
 
     // Initial fetch
@@ -351,7 +362,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     // Set interval
     const intervalId = setInterval(refreshPrices, 60000);
 
-    return () => clearInterval(intervalId);
+    return () => {
+      isCurrent = false; // Cancel any pending updates if dependencies change
+      clearInterval(intervalId);
+    };
     // Dependencies: data changes should restart the timer to ensure we always refresh the *latest* list
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]); // Re-run if list changes
