@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, PieChart as PieIcon } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
@@ -1051,342 +1051,309 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             </select>
           </div>
         </div>
-      </div>
 
-      {/* Portfolio Allocation Chart */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <PieIcon size={20} className="mr-2" />
-          Portfolio Allocation
-        </h2>
-        {(() => {
-          // Calculate totals for each asset class
-          // 1. Stocks
-          const stocksTotal = data.stocks.reduce((acc, stock) => {
-            const value = stock.shares * (stock.currentPrice || stock.purchasePrice);
-            return acc + convertCurrency(value, stock.currency, baseCurrency);
+
+
+        {/* Tabs */}
+        <div
+          className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200"
+          style={{ transform: `translateY(${pullDistance}px)` }}
+        >
+          <div className="flex border-b border-gray-200">
+            {[
+              { id: 'stock' as InvestmentType, label: 'Stocks', icon: TrendingUp },
+              { id: 'crypto' as InvestmentType, label: 'Crypto', icon: Coins },
+              { id: 'fixed' as InvestmentType, label: 'Fixed', icon: DollarSign },
+              { id: 'variable' as InvestmentType, label: 'Variable', icon: BarChart3 },
+            ].map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => {
+                    setActiveTab(tab.id);
+                    if (!showForm) setShowForm(false);
+                  }}
+                  className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${activeTab === tab.id
+                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
+                    : 'text-gray-600 hover:bg-gray-50'
+                    }`}
+                >
+                  <Icon size={20} />
+                  <span className="text-xs font-medium">{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Add Button */}
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200"
+            style={{ transform: `translateY(${pullDistance}px)` }}
+          >
+            <Plus size={20} />
+            Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investment'}
+          </button>
+        )}
+
+        {/* Form */}
+        {renderForm()}
+
+        {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
+
+
+        {priceUpdateTime && (
+          <div className="text-xs text-gray-500 text-center">
+            Last updated: {priceUpdateTime.toLocaleTimeString()}
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        {activeTab === 'stock' && data.stocks.length > 0 && (() => {
+          const totalCurrentValue = data.stocks.reduce((sum, stock) => {
+            const currentPrice = stock.currentPrice || stock.purchasePrice;
+            const value = currentPrice * stock.shares;
+            return sum + convertCurrency(value, stock.currency, baseCurrency);
           }, 0);
-
-          // 2. Crypto
-          const cryptoTotal = data.crypto.reduce((acc, coin) => {
-            const value = coin.amount * (coin.currentPrice || coin.purchasePrice);
-            return acc + convertCurrency(value, coin.currency, baseCurrency);
+          const totalInvested = data.stocks.reduce((sum, stock) => {
+            const value = stock.purchasePrice * stock.shares;
+            return sum + convertCurrency(value, stock.currency, baseCurrency);
           }, 0);
-
-          // 3. Fixed Income
-          const fixedTotal = data.fixedIncome.reduce((acc, item) => {
-            return acc + convertCurrency(item.amount, item.currency, baseCurrency);
-          }, 0);
-
-          // 4. Variable Investments
-          const variableTotal = data.variableInvestments.reduce((acc, item) => {
-            const value = item.currentValue || item.amount;
-            return acc + convertCurrency(value, item.currency, baseCurrency);
-          }, 0);
-
-          const totalPortfolioValue = stocksTotal + cryptoTotal + fixedTotal + variableTotal;
-
-          if (totalPortfolioValue === 0) {
-            return <p className="text-gray-500 text-center py-8">Add investments to see your allocation</p>;
-          }
-
-          const chartData = [
-            { name: 'Stocks', value: stocksTotal, color: '#3B82F6' }, // Blue
-            { name: 'Crypto', value: cryptoTotal, color: '#8B5CF6' }, // Purple
-            { name: 'Fixed Income', value: fixedTotal, color: '#10B981' }, // Green
-            { name: 'Variable', value: variableTotal, color: '#F59E0B' }, // Yellow
-          ].filter(item => item.value > 0);
+          const totalGainLoss = totalCurrentValue - totalInvested;
+          const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
           return (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }: any) => {
-                      const RADIAN = Math.PI / 180;
-                      const radius = outerRadius + 25; // Push label further out
-                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                      return (
-                        <text
-                          x={x}
-                          y={y}
-                          fill="#374151"
-                          textAnchor={x > cx ? 'start' : 'end'}
-                          dominantBaseline="central"
-                          fontSize={11}
-                        >
-                          {`${(percent * 100).toFixed(0)}%`}
-                        </text>
-                      );
-                    }}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any) => {
-                      if (Array.isArray(value) && value.length > 0) return formatCompactCurrency(Number(value[0]), baseCurrency);
-                      if (typeof value === 'number') return formatCompactCurrency(value, baseCurrency);
-                      return formatCompactCurrency(0, baseCurrency);
-                    }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Legend
-                    layout="vertical"
-                    verticalAlign="middle"
-                    align="right"
-                    wrapperStyle={{ fontSize: '12px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+            <div
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              style={{ transform: `translateY(${pullDistance}px)` }}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Total Stocks Value</span>
+                <TrendingUp size={20} className="text-blue-500" />
+              </div>
+              <div className="text-2xl font-bold text-blue-600 mb-2">
+                {formatCompactCurrency(totalCurrentValue, baseCurrency)}
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
+                <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
+                  ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+                </span>
+              </div>
             </div>
           );
         })()}
-      </div>
 
-      {/* Tabs */}
-      <div
-        className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200"
-        style={{ transform: `translateY(${pullDistance}px)` }}
-      >
-        <div className="flex border-b border-gray-200">
-          {[
-            { id: 'stock' as InvestmentType, label: 'Stocks', icon: TrendingUp },
-            { id: 'crypto' as InvestmentType, label: 'Crypto', icon: Coins },
-            { id: 'fixed' as InvestmentType, label: 'Fixed', icon: DollarSign },
-            { id: 'variable' as InvestmentType, label: 'Variable', icon: BarChart3 },
-          ].map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  if (!showForm) setShowForm(false);
-                }}
-                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${activeTab === tab.id
-                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-              >
-                <Icon size={20} />
-                <span className="text-xs font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+        {activeTab === 'crypto' && data.crypto.length > 0 && (() => {
+          const totalCurrentValue = data.crypto.reduce((sum, crypto) => {
+            const currentPrice = crypto.currentPrice || crypto.purchasePrice;
+            const value = currentPrice * crypto.amount;
+            return sum + convertCurrency(value, crypto.currency, baseCurrency);
+          }, 0);
+          const totalInvested = data.crypto.reduce((sum, crypto) => {
+            const value = crypto.purchasePrice * crypto.amount;
+            return sum + convertCurrency(value, crypto.currency, baseCurrency);
+          }, 0);
+          const totalGainLoss = totalCurrentValue - totalInvested;
+          const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
-      {/* Add Button */}
-      {!showForm && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200"
+          return (
+            <div
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              style={{ transform: `translateY(${pullDistance}px)` }}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Total Crypto Value</span>
+                <Coins size={20} className="text-purple-500" />
+              </div>
+              <div className="text-2xl font-bold text-purple-600 mb-2">
+                {formatCompactCurrency(totalCurrentValue, baseCurrency)}
+              </div>
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
+                <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
+                  ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+                </span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {activeTab === 'fixed' && data.fixedIncome.length > 0 && (() => {
+          const totalValue = data.fixedIncome.reduce((sum, fixed) => {
+            return sum + convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+          }, 0);
+
+          return (
+            <div
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              style={{ transform: `translateY(${pullDistance}px)` }}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Total Fixed Income Value</span>
+                <DollarSign size={20} className="text-green-500" />
+              </div>
+              <div className="text-2xl font-bold text-green-600">
+                {formatCompactCurrency(totalValue, baseCurrency)}
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          );
+        })()}
+
+        {activeTab === 'variable' && data.variableInvestments.length > 0 && (() => {
+          const totalValue = data.variableInvestments.reduce((sum, inv) => {
+            const value = inv.currentValue || inv.amount;
+            return sum + convertCurrency(value, inv.currency, baseCurrency);
+          }, 0);
+
+          return (
+            <div
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              style={{ transform: `translateY(${pullDistance}px)` }}
+            >
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-gray-600">Total Variable Investments Value</span>
+                <BarChart3 size={20} className="text-yellow-500" />
+              </div>
+              <div className="text-2xl font-bold text-yellow-600">
+                {formatCompactCurrency(totalValue, baseCurrency)}
+              </div>
+              <div className="text-sm text-gray-500 mt-1">
+                {data.variableInvestments.length} investment{data.variableInvestments.length !== 1 ? 's' : ''}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* List */}
+        <div
+          className="bg-white rounded-lg shadow transition-transform duration-200"
           style={{ transform: `translateY(${pullDistance}px)` }}
         >
-          <Plus size={20} />
-          Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investment'}
-        </button>
-      )}
-
-      {/* Form */}
-      {renderForm()}
-
-      {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
-
-
-      {priceUpdateTime && (
-        <div className="text-xs text-gray-500 text-center">
-          Last updated: {priceUpdateTime.toLocaleTimeString()}
-        </div>
-      )}
-
-      {/* Summary Cards */}
-      {activeTab === 'stock' && data.stocks.length > 0 && (() => {
-        const totalCurrentValue = data.stocks.reduce((sum, stock) => {
-          const currentPrice = stock.currentPrice || stock.purchasePrice;
-          const value = currentPrice * stock.shares;
-          return sum + convertCurrency(value, stock.currency, baseCurrency);
-        }, 0);
-        const totalInvested = data.stocks.reduce((sum, stock) => {
-          const value = stock.purchasePrice * stock.shares;
-          return sum + convertCurrency(value, stock.currency, baseCurrency);
-        }, 0);
-        const totalGainLoss = totalCurrentValue - totalInvested;
-        const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
-
-        return (
-          <div
-            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
-            style={{ transform: `translateY(${pullDistance}px)` }}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600">Total Stocks Value</span>
-              <TrendingUp size={20} className="text-blue-500" />
-            </div>
-            <div className="text-2xl font-bold text-blue-600 mb-2">
-              {formatCompactCurrency(totalCurrentValue, baseCurrency)}
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
-              <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
-                ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
-              </span>
-            </div>
+          <div className="p-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investments'}
+            </h2>
           </div>
-        );
-      })()}
+          {(() => {
+            if (activeTab === 'stock') {
+              if (data.stocks.length === 0) {
+                return <div className="p-8 text-center text-gray-500">No stocks added yet</div>;
+              }
+              return (
+                <div className="divide-y divide-gray-100">
+                  {[...data.stocks]
+                    .sort((a, b) => {
+                      const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
+                      const valueB = (b.currentPrice || b.purchasePrice) * b.shares;
+                      // Convert to base currency for accurate comparison
+                      const convertedValueA = convertCurrency(valueA, a.currency, baseCurrency);
+                      const convertedValueB = convertCurrency(valueB, b.currency, baseCurrency);
+                      return convertedValueB - convertedValueA; // Descending order (Highest to Lowest)
+                    })
+                    .map(stock => {
+                      const currentPrice = stock.currentPrice || stock.purchasePrice;
+                      const currentValue = currentPrice * stock.shares;
+                      const purchaseValue = stock.purchasePrice * stock.shares;
+                      const gainLoss = currentValue - purchaseValue;
+                      const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
-      {activeTab === 'crypto' && data.crypto.length > 0 && (() => {
-        const totalCurrentValue = data.crypto.reduce((sum, crypto) => {
-          const currentPrice = crypto.currentPrice || crypto.purchasePrice;
-          const value = currentPrice * crypto.amount;
-          return sum + convertCurrency(value, crypto.currency, baseCurrency);
-        }, 0);
-        const totalInvested = data.crypto.reduce((sum, crypto) => {
-          const value = crypto.purchasePrice * crypto.amount;
-          return sum + convertCurrency(value, crypto.currency, baseCurrency);
-        }, 0);
-        const totalGainLoss = totalCurrentValue - totalInvested;
-        const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
+                      const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
+                      const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
+                      const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
 
-        return (
-          <div
-            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
-            style={{ transform: `translateY(${pullDistance}px)` }}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600">Total Crypto Value</span>
-              <Coins size={20} className="text-purple-500" />
-            </div>
-            <div className="text-2xl font-bold text-purple-600 mb-2">
-              {formatCompactCurrency(totalCurrentValue, baseCurrency)}
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
-              <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
-                ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
-              </span>
-            </div>
-          </div>
-        );
-      })()}
-
-      {activeTab === 'fixed' && data.fixedIncome.length > 0 && (() => {
-        const totalValue = data.fixedIncome.reduce((sum, fixed) => {
-          return sum + convertCurrency(fixed.amount, fixed.currency, baseCurrency);
-        }, 0);
-
-        return (
-          <div
-            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
-            style={{ transform: `translateY(${pullDistance}px)` }}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600">Total Fixed Income Value</span>
-              <DollarSign size={20} className="text-green-500" />
-            </div>
-            <div className="text-2xl font-bold text-green-600">
-              {formatCompactCurrency(totalValue, baseCurrency)}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">
-              {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        );
-      })()}
-
-      {activeTab === 'variable' && data.variableInvestments.length > 0 && (() => {
-        const totalValue = data.variableInvestments.reduce((sum, inv) => {
-          const value = inv.currentValue || inv.amount;
-          return sum + convertCurrency(value, inv.currency, baseCurrency);
-        }, 0);
-
-        return (
-          <div
-            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
-            style={{ transform: `translateY(${pullDistance}px)` }}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm text-gray-600">Total Variable Investments Value</span>
-              <BarChart3 size={20} className="text-yellow-500" />
-            </div>
-            <div className="text-2xl font-bold text-yellow-600">
-              {formatCompactCurrency(totalValue, baseCurrency)}
-            </div>
-            <div className="text-sm text-gray-500 mt-1">
-              {data.variableInvestments.length} investment{data.variableInvestments.length !== 1 ? 's' : ''}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* List */}
-      <div
-        className="bg-white rounded-lg shadow transition-transform duration-200"
-        style={{ transform: `translateY(${pullDistance}px)` }}
-      >
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">
-            {activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investments'}
-          </h2>
-        </div>
-        {(() => {
-          if (activeTab === 'stock') {
-            if (data.stocks.length === 0) {
-              return <div className="p-8 text-center text-gray-500">No stocks added yet</div>;
+                      return (
+                        <div key={stock.id} className="p-4">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0 mr-2">
+                              <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
+                              </div>
+                              {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                                <div className="text-sm text-gray-500">
+                                  Current: {formatCurrency(stock.currentPrice, stock.currency)}
+                                </div>
+                              )}
+                              <div className="text-lg font-bold text-blue-600 mt-2">
+                                {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
+                              </div>
+                              {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                                <div className="mt-2 space-y-1">
+                                  <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
+                                    ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEdit('stock', stock)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              >
+                                <Edit2 size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete('stock', stock.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              );
             }
-            return (
-              <div className="divide-y divide-gray-100">
-                {[...data.stocks]
-                  .sort((a, b) => {
-                    const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
-                    const valueB = (b.currentPrice || b.purchasePrice) * b.shares;
-                    // Convert to base currency for accurate comparison
-                    const convertedValueA = convertCurrency(valueA, a.currency, baseCurrency);
-                    const convertedValueB = convertCurrency(valueB, b.currency, baseCurrency);
-                    return convertedValueB - convertedValueA; // Descending order (Highest to Lowest)
-                  })
-                  .map(stock => {
-                    const currentPrice = stock.currentPrice || stock.purchasePrice;
-                    const currentValue = currentPrice * stock.shares;
-                    const purchaseValue = stock.purchasePrice * stock.shares;
+
+            if (activeTab === 'crypto') {
+              if (data.crypto.length === 0) {
+                return <div className="p-8 text-center text-gray-500">No crypto added yet</div>;
+              }
+              return (
+                <div className="divide-y divide-gray-100">
+                  {data.crypto.map(crypto => {
+                    const currentPrice = crypto.currentPrice || crypto.purchasePrice;
+                    const currentValue = currentPrice * crypto.amount;
+                    const purchaseValue = crypto.purchasePrice * crypto.amount;
                     const gainLoss = currentValue - purchaseValue;
                     const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
-                    const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
-                    const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
-                    const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
+                    const convertedCurrentValue = convertCurrency(currentValue, crypto.currency, baseCurrency);
+                    const convertedPurchaseValue = convertCurrency(purchaseValue, crypto.currency, baseCurrency);
+                    const convertedGainLoss = convertCurrency(gainLoss, crypto.currency, baseCurrency);
 
                     return (
-                      <div key={stock.id} className="p-4">
+                      <div key={crypto.id} className="p-4">
                         <div className="flex justify-between items-start">
                           <div className="flex-1 min-w-0 mr-2">
-                            <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
+                            <div className="font-semibold text-lg text-gray-800 truncate">{crypto.symbol}</div>
                             <div className="text-sm text-gray-500 mt-1">
-                              {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
+                              {crypto.amount.toFixed(8)} {crypto.symbol} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
                             </div>
-                            {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                            {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
                               <div className="text-sm text-gray-500">
-                                Current: {formatCurrency(stock.currentPrice, stock.currency)}
+                                Current: {formatCurrency(crypto.currentPrice, crypto.currency)}
                               </div>
                             )}
-                            <div className="text-lg font-bold text-blue-600 mt-2">
+                            <div className="text-lg font-bold text-purple-600 mt-2">
                               {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
                             </div>
-                            {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                            {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
                               <div className="mt-2 space-y-1">
                                 <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                   {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
@@ -1400,13 +1367,13 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                           </div>
                           <div className="flex gap-2">
                             <button
-                              onClick={() => handleEdit('stock', stock)}
+                              onClick={() => handleEdit('crypto', crypto)}
                               className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                             >
                               <Edit2 size={18} />
                             </button>
                             <button
-                              onClick={() => handleDelete('stock', stock.id)}
+                              onClick={() => handleDelete('crypto', crypto.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                             >
                               <Trash2 size={18} />
@@ -1416,111 +1383,91 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       </div>
                     );
                   })}
-              </div>
-            );
-          }
-
-          if (activeTab === 'crypto') {
-            if (data.crypto.length === 0) {
-              return <div className="p-8 text-center text-gray-500">No crypto added yet</div>;
+                </div>
+              );
             }
-            return (
-              <div className="divide-y divide-gray-100">
-                {data.crypto.map(crypto => {
-                  const currentPrice = crypto.currentPrice || crypto.purchasePrice;
-                  const currentValue = currentPrice * crypto.amount;
-                  const purchaseValue = crypto.purchasePrice * crypto.amount;
-                  const gainLoss = currentValue - purchaseValue;
-                  const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
-                  const convertedCurrentValue = convertCurrency(currentValue, crypto.currency, baseCurrency);
-                  const convertedPurchaseValue = convertCurrency(purchaseValue, crypto.currency, baseCurrency);
-                  const convertedGainLoss = convertCurrency(gainLoss, crypto.currency, baseCurrency);
-
-                  return (
-                    <div key={crypto.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <div className="font-semibold text-lg text-gray-800 truncate">{crypto.symbol}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {crypto.amount.toFixed(8)} {crypto.symbol} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
-                          </div>
-                          {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
-                            <div className="text-sm text-gray-500">
-                              Current: {formatCurrency(crypto.currentPrice, crypto.currency)}
+            if (activeTab === 'fixed') {
+              if (data.fixedIncome.length === 0) {
+                return <div className="p-8 text-center text-gray-500">No fixed income investments added yet</div>;
+              }
+              return (
+                <div className="divide-y divide-gray-100">
+                  {data.fixedIncome.map(fixed => {
+                    const convertedValue = convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+                    return (
+                      <div key={fixed.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0 mr-2">
+                            <div className="font-semibold text-lg text-gray-800 truncate">{fixed.name}</div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              Interest Rate: {fixed.interestRate}%
                             </div>
-                          )}
-                          <div className="text-lg font-bold text-purple-600 mt-2">
-                            {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
-                          </div>
-                          {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
-                            <div className="mt-2 space-y-1">
-                              <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
-                                ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                            {fixed.maturityDate && (
+                              <div className="text-sm text-gray-500">
+                                Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
-                              </div>
+                            )}
+                            <div className="text-lg font-bold text-green-600 mt-2">
+                              {formatCompactCurrency(convertedValue, baseCurrency)}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit('crypto', crypto)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete('crypto', crypto.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEdit('fixed', fixed)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete('fixed', fixed.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          }
+                    );
+                  })}
+                </div>
+              );
+            }
 
-          if (activeTab === 'fixed') {
-            if (data.fixedIncome.length === 0) {
-              return <div className="p-8 text-center text-gray-500">No fixed income investments added yet</div>;
+            if (data.variableInvestments.length === 0) {
+              return <div className="p-8 text-center text-gray-500">No variable investments added yet</div>;
             }
             return (
               <div className="divide-y divide-gray-100">
-                {data.fixedIncome.map(fixed => {
-                  const convertedValue = convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+                {data.variableInvestments.map(inv => {
+                  const value = inv.currentValue || inv.amount;
+                  const convertedValue = convertCurrency(value, inv.currency, baseCurrency);
                   return (
-                    <div key={fixed.id} className="p-4">
+                    <div key={inv.id} className="p-4">
                       <div className="flex justify-between items-start">
                         <div className="flex-1 min-w-0 mr-2">
-                          <div className="font-semibold text-lg text-gray-800 truncate">{fixed.name}</div>
+                          <div className="font-semibold text-lg text-gray-800 truncate">{inv.name}</div>
                           <div className="text-sm text-gray-500 mt-1">
-                            Interest Rate: {fixed.interestRate}%
+                            Initial: {formatCurrency(inv.amount, inv.currency)}
                           </div>
-                          {fixed.maturityDate && (
+                          {inv.currentValue && (
                             <div className="text-sm text-gray-500">
-                              Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
+                              Current: {formatCurrency(inv.currentValue, inv.currency)}
                             </div>
                           )}
-                          <div className="text-lg font-bold text-green-600 mt-2">
+                          <div className="text-lg font-bold text-yellow-600 mt-2">
                             {formatCompactCurrency(convertedValue, baseCurrency)}
                           </div>
                         </div>
                         <div className="flex gap-2">
                           <button
-                            onClick={() => handleEdit('fixed', fixed)}
+                            onClick={() => handleEdit('variable', inv)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
                           >
                             <Edit2 size={18} />
                           </button>
                           <button
-                            onClick={() => handleDelete('fixed', fixed.id)}
+                            onClick={() => handleDelete('variable', inv.id)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
                           >
                             <Trash2 size={18} />
@@ -1532,54 +1479,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 })}
               </div>
             );
-          }
-
-          if (data.variableInvestments.length === 0) {
-            return <div className="p-8 text-center text-gray-500">No variable investments added yet</div>;
-          }
-          return (
-            <div className="divide-y divide-gray-100">
-              {data.variableInvestments.map(inv => {
-                const value = inv.currentValue || inv.amount;
-                const convertedValue = convertCurrency(value, inv.currency, baseCurrency);
-                return (
-                  <div key={inv.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0 mr-2">
-                        <div className="font-semibold text-lg text-gray-800 truncate">{inv.name}</div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          Initial: {formatCurrency(inv.amount, inv.currency)}
-                        </div>
-                        {inv.currentValue && (
-                          <div className="text-sm text-gray-500">
-                            Current: {formatCurrency(inv.currentValue, inv.currency)}
-                          </div>
-                        )}
-                        <div className="text-lg font-bold text-yellow-600 mt-2">
-                          {formatCompactCurrency(convertedValue, baseCurrency)}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEdit('variable', inv)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete('variable', inv.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
+          })()}
+        </div>
       </div>
     </div>
   );

@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, PieChart as PieIcon } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { AppData, Currency } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+
 
 interface DashboardProps {
   data: AppData;
@@ -85,7 +85,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
       {/* Investment Summary */}
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
-          <PieIcon size={20} className="mr-2" />
+
           Investment Summary
         </h2>
         <div className="grid grid-cols-2 gap-4">
@@ -136,83 +136,6 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
               ))}
           </div>
         )}
-      </div>
-
-      {/* Expenses by Category Chart */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Expenses by Category (Month)</h2>
-        {(() => {
-          const now = new Date();
-          const currentYear = now.getFullYear();
-          const currentMonth = now.getMonth();
-
-          // 1. Filter expenses for current month
-          const monthlyExpensesList = data.expenses.filter(expense => {
-            const [yearStr, monthStr] = expense.date.split('-');
-            const year = parseInt(yearStr);
-            const month = parseInt(monthStr) - 1;
-            return year === currentYear && month === currentMonth;
-          });
-
-          if (monthlyExpensesList.length === 0) {
-            return <p className="text-gray-500 text-center py-8">No expenses this month</p>;
-          }
-
-          // 2. Group by category and sum
-          const categoryTotals: Record<string, number> = {};
-          monthlyExpensesList.forEach(expense => {
-            const amountInBase = convertCurrency(expense.amount, expense.currency, baseCurrency);
-            categoryTotals[expense.category] = (categoryTotals[expense.category] || 0) + amountInBase;
-          });
-
-          // 3. Convert to array for Recharts
-          const chartData = Object.keys(categoryTotals)
-            .map(category => ({
-              name: category,
-              value: categoryTotals[category],
-            }))
-            .sort((a, b) => b.value - a.value); // Sort highest to lowest
-
-          // Professional color palette
-          const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1'];
-
-          return (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={chartData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={60}
-                    paddingAngle={5}
-                    dataKey="value"
-                    label={({ value }: any) => formatCompactCurrency(value, baseCurrency)}
-                  >
-                    {chartData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any) => {
-                      if (Array.isArray(value) && value.length > 0) return formatCompactCurrency(Number(value[0]), baseCurrency);
-                      if (typeof value === 'number') return formatCompactCurrency(value, baseCurrency);
-                      return formatCompactCurrency(0, baseCurrency);
-                    }}
-                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                  />
-                  <Legend
-                    layout="vertical"
-                    verticalAlign="middle"
-                    align="right"
-                    wrapperStyle={{ fontSize: '12px' }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          );
-        })()}
       </div>
     </div>
   );

@@ -110,7 +110,7 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                 </div>
 
                 <div className="text-center text-xs text-gray-400 mt-8">
-                    Net Worth Tracker v1.3.3 - Secure Sync Active 🔒
+                    Net Worth Tracker v1.4.0 - Performance Edition ⚡
 
                 </div>
             </div>
