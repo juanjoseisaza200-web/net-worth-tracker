@@ -1033,7 +1033,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
       {/* Header with Currency Selector */}
       <div
-        className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+        className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
         style={{ transform: `translateY(${pullDistance}px)` }}
       >
         <div className="flex items-center justify-between">
@@ -1056,7 +1056,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
         {/* Tabs */}
         <div
-          className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200"
+          className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200 mb-4"
           style={{ transform: `translateY(${pullDistance}px)` }}
         >
           <div className="flex border-b border-gray-200">
@@ -1091,7 +1091,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         {!showForm && (
           <button
             onClick={() => setShowForm(true)}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200"
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200 mb-4"
             style={{ transform: `translateY(${pullDistance}px)` }}
           >
             <Plus size={20} />
@@ -1127,7 +1127,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
           return (
             <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
               style={{ transform: `translateY(${pullDistance}px)` }}
             >
               <div className="flex justify-between items-center mb-2">
@@ -1163,7 +1163,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
           return (
             <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
               style={{ transform: `translateY(${pullDistance}px)` }}
             >
               <div className="flex justify-between items-center mb-2">
@@ -1191,7 +1191,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
           return (
             <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
               style={{ transform: `translateY(${pullDistance}px)` }}
             >
               <div className="flex justify-between items-center mb-2">
@@ -1216,7 +1216,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
           return (
             <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
               style={{ transform: `translateY(${pullDistance}px)` }}
             >
               <div className="flex justify-between items-center mb-2">
@@ -1235,7 +1235,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
         {/* List */}
         <div
-          className="bg-white rounded-lg shadow transition-transform duration-200"
+          className="bg-white rounded-lg shadow transition-transform duration-200 mb-4"
           style={{ transform: `translateY(${pullDistance}px)` }}
         >
           <div className="p-4 border-b border-gray-200">
