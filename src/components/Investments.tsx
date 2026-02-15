@@ -432,10 +432,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       const currentY = e.touches[0].clientY;
       const diff = currentY - pullStartY.current;
 
-      // Add a deadzone of 10px so simple taps/micro-drags don't trigger state updates (re-renders)
-      if (diff > 10) {
+      // Add a deadzone of 15px to ensure we really mean to pull
+      if (diff > 15) {
         // Add resistance to the pull
-        setPullDistance(Math.min((diff - 10) * 0.5, 120));
+        setPullDistance(Math.min((diff - 15) * 0.5, 120));
       }
     }
   };
@@ -1011,6 +1011,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   return (
     <div
       className="p-4 space-y-4 pb-24 relative min-h-screen touch-pan-y"
+      style={{ paddingTop: '1px' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
