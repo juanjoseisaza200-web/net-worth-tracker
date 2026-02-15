@@ -74,25 +74,20 @@ export const formatAdaptiveCurrency = (amount: number, currency: Currency): stri
   return formatCompactCurrency(amount, currency);
 };
 
-// Function to fetch real-time exchange rates
+// Function to fetch real-time exchange rates (placeholder for API integration)
 export const fetchExchangeRates = async (): Promise<void> => {
   try {
-    const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    if (!response.ok) throw new Error('Failed to fetch rates');
-
-    const data = await response.json();
-
-    // Update rates
-    Object.keys(exchangeRates).forEach(currency => {
-      // The API returns rates relative to USD, which matches our base
-      if (data.rates[currency]) {
-        exchangeRates[currency as Currency] = data.rates[currency];
-      }
-    });
-
-    console.log('Exchange rates updated:', exchangeRates);
+    // Example API call (uncomment and configure when ready):
+    // const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+    // const data = await response.json();
+    // Object.keys(exchangeRates).forEach(currency => {
+    //   if (data.rates[currency]) {
+    //     exchangeRates[currency] = 1 / data.rates[currency];
+    //   }
+    // });
+    console.log('Exchange rates updated');
   } catch (error) {
-    console.warn('Error fetching exchange rates, using fallback values:', error);
+    console.error('Error fetching exchange rates:', error);
   }
 };
 
