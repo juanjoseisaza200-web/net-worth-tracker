@@ -87,9 +87,12 @@ export const calculateTotalIncome = (data: AppData, targetCurrency: Currency, pe
 
   // Calculate recurring income for the period
   if (period === 'month') {
-    // For monthly, count active recurring incomes once
+    // For monthly, count active recurring incomes ONLY if the pay date has occurred
+    const currentDay = now.getDate();
     data.recurringIncomes.forEach(recurring => {
-      if (recurring.isActive) {
+      // Only count if active AND the pay day has passed or is today
+      // This makes "Net Monthly" reflect actual cash flow so far
+      if (recurring.isActive && recurring.dayOfMonth <= currentDay) {
         total += convertCurrency(recurring.amount, recurring.currency, targetCurrency);
       }
     });
