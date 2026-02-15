@@ -27,6 +27,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [priceUpdateTime, setPriceUpdateTime] = useState<Date | null>(null);
 
+  // Pull-to-Refresh State
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [pullStartY, setPullStartY] = useState(0);
+  const [pullDistance, setPullDistance] = useState(0);
+  const PULL_THRESHOLD = 80; // Pixels to pull down to trigger refresh
+
   const [stockForm, setStockForm] = useState({
     symbol: '',
     shares: '',
@@ -334,35 +340,20 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
   };
 
-  // Auto-refresh prices every 60 seconds (only if visible)
-  useEffect(() => {
-    /* Fixed: Added cancellation flag (isCurrent) to prevent race conditions.
-       If data changes (e.g. from cloud sync) while fetching prices, this flag becomes false
-       and the stale update is abandoned, preventing UI reversion. */
-    let isCurrent = true;
+  // Reusable refresh logic
+  const refreshPrices = async (isManual = false) => {
+    if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
-    const refreshPrices = async () => {
-      // 1. Visibility Guard
-      if (document.hidden) return;
+    if (isManual) setIsRefreshing(true);
 
-      // 2. Settings Check
-      const autoUpdate = data.settings?.autoUpdatePrices ?? true;
-      if (!autoUpdate) return;
+    const updatedData = { ...data };
+    let hasUpdates = false;
 
-      if (data.stocks.length === 0 && data.crypto.length === 0) return;
-
-      // 3. Local-First Update
-      // setIsRefreshingPrices(true); // State removed as unused
-      const updatedData = { ...data };
-      let hasUpdates = false;
-
+    try {
       // Fetch stock prices
       if (data.stocks.length > 0) {
         const stockSymbols = data.stocks.map(s => s.symbol);
         const stockPrices = await fetchStockPrices(stockSymbols);
-
-        // CHECK CANCELLATION
-        if (!isCurrent) return;
 
         updatedData.stocks = data.stocks.map(stock => {
           if (stockPrices[stock.symbol] && stockPrices[stock.symbol] !== stock.currentPrice) {
@@ -378,9 +369,6 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         const cryptoSymbols = data.crypto.map(c => c.symbol);
         const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
 
-        // CHECK CANCELLATION
-        if (!isCurrent) return;
-
         updatedData.crypto = data.crypto.map(crypto => {
           if (cryptoPrices[crypto.symbol] && cryptoPrices[crypto.symbol] !== crypto.currentPrice) {
             hasUpdates = true;
@@ -390,29 +378,71 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         });
       }
 
-      if (hasUpdates && isCurrent) {
-        // IMPORTANT: Use saveLocalData (local only) instead of setData (cloud save)
-        saveLocalData(updatedData);
+      if (hasUpdates) {
+        // If manual refresh, save to cloud (setData). If auto, local only (saveLocalData).
+        if (isManual) {
+          setData(updatedData);
+        } else {
+          saveLocalData(updatedData);
+        }
         setPriceUpdateTime(new Date());
       }
-      if (isCurrent) {
-        // setIsRefreshingPrices(false); // State removed as unused
-      }
+    } catch (error) {
+      console.error("Error refreshing prices:", error);
+    } finally {
+      if (isManual) setIsRefreshing(false);
+    }
+  };
+
+  // Auto-refresh prices every 60 seconds
+  useEffect(() => {
+    let isCurrent = true;
+
+    const autoRefresh = async () => {
+      if (document.hidden) return;
+      const autoUpdate = data.settings?.autoUpdatePrices ?? true;
+      if (!autoUpdate) return;
+
+      if (isCurrent) await refreshPrices(false);
     };
 
     // Initial fetch
-    refreshPrices();
+    autoRefresh();
 
-    // Set interval
-    const intervalId = setInterval(refreshPrices, 60000);
+    const intervalId = setInterval(autoRefresh, 60000);
 
     return () => {
-      isCurrent = false; // Cancel any pending updates if dependencies change
+      isCurrent = false;
       clearInterval(intervalId);
     };
-    // Dependencies: data changes should restart the timer to ensure we always refresh the *latest* list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]); // Re-run if list changes
+  }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]);
+
+  // Touch Handlers for Pull-to-Refresh
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      setPullStartY(e.touches[0].clientY);
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (pullStartY > 0 && window.scrollY === 0) {
+      const currentY = e.touches[0].clientY;
+      const diff = currentY - pullStartY;
+      if (diff > 0) {
+        // Add resistance to the pull
+        setPullDistance(Math.min(diff * 0.5, 120));
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pullDistance > PULL_THRESHOLD) {
+      refreshPrices(true); // Trigger manual refresh
+    }
+    setPullStartY(0);
+    setPullDistance(0);
+  };
 
   const renderEstimatedPnL = (sharesStr: string, purchasePriceStr: string, currentPriceStr: string) => {
     const shares = parseFloat(sharesStr);
@@ -975,9 +1005,32 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   };
 
   return (
-    <div className="p-4 space-y-4 pb-24">
+    <div
+      className="p-4 space-y-4 pb-24 relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull-to-Refresh Indicator */}
+      {(pullDistance > 0 || isRefreshing) && (
+        <div
+          className="absolute left-0 right-0 flex justify-center items-center z-10 transition-transform duration-200"
+          style={{ top: isRefreshing ? '20px' : `${Math.min(pullDistance / 2, 40)}px` }}
+        >
+          <div className="bg-white rounded-full p-2 shadow-md flex items-center gap-2">
+            <div className={`w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full ${isRefreshing || pullDistance > PULL_THRESHOLD ? 'animate-spin' : ''}`} />
+            <span className="text-xs font-medium text-blue-600">
+              {isRefreshing ? 'Updating Prices...' : pullDistance > PULL_THRESHOLD ? 'Release to Refresh' : 'Pull to Refresh'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Header with Currency Selector */}
-      <div className="bg-white rounded-lg shadow p-4">
+      <div
+        className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+        style={{ transform: `translateY(${pullDistance}px)` }}
+      >
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-gray-800">Investments</h1>
           <div className="flex items-center gap-2">
@@ -996,7 +1049,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       </div>
 
       {/* Tabs */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
+      <div
+        className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200"
+        style={{ transform: `translateY(${pullDistance}px)` }}
+      >
         <div className="flex border-b border-gray-200">
           {[
             { id: 'stock' as InvestmentType, label: 'Stocks', icon: TrendingUp },
@@ -1029,7 +1085,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       {!showForm && (
         <button
           onClick={() => setShowForm(true)}
-          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
+          className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200"
+          style={{ transform: `translateY(${pullDistance}px)` }}
         >
           <Plus size={20} />
           Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investment'}
@@ -1063,7 +1120,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
         return (
-          <div className="bg-white rounded-lg shadow p-4">
+          <div
+            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+            style={{ transform: `translateY(${pullDistance}px)` }}
+          >
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-gray-600">Total Stocks Value</span>
               <TrendingUp size={20} className="text-blue-500" />
@@ -1096,7 +1156,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
         return (
-          <div className="bg-white rounded-lg shadow p-4">
+          <div
+            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+            style={{ transform: `translateY(${pullDistance}px)` }}
+          >
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-gray-600">Total Crypto Value</span>
               <Coins size={20} className="text-purple-500" />
@@ -1121,7 +1184,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         }, 0);
 
         return (
-          <div className="bg-white rounded-lg shadow p-4">
+          <div
+            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+            style={{ transform: `translateY(${pullDistance}px)` }}
+          >
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-gray-600">Total Fixed Income Value</span>
               <DollarSign size={20} className="text-green-500" />
@@ -1143,7 +1209,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         }, 0);
 
         return (
-          <div className="bg-white rounded-lg shadow p-4">
+          <div
+            className="bg-white rounded-lg shadow p-4 transition-transform duration-200"
+            style={{ transform: `translateY(${pullDistance}px)` }}
+          >
             <div className="flex justify-between items-center mb-2">
               <span className="text-sm text-gray-600">Total Variable Investments Value</span>
               <BarChart3 size={20} className="text-yellow-500" />
@@ -1159,7 +1228,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       })()}
 
       {/* List */}
-      <div className="bg-white rounded-lg shadow">
+      <div
+        className="bg-white rounded-lg shadow transition-transform duration-200"
+        style={{ transform: `translateY(${pullDistance}px)` }}
+      >
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">
             {activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investments'}
