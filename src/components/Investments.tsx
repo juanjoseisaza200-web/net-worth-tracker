@@ -1172,63 +1172,72 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             }
             return (
               <div className="divide-y divide-gray-100">
-                {data.stocks.map(stock => {
-                  const currentPrice = stock.currentPrice || stock.purchasePrice;
-                  const currentValue = currentPrice * stock.shares;
-                  const purchaseValue = stock.purchasePrice * stock.shares;
-                  const gainLoss = currentValue - purchaseValue;
-                  const gainLossPercent = ((gainLoss / purchaseValue) * 100);
+                {[...data.stocks]
+                  .sort((a, b) => {
+                    const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
+                    const valueB = (b.currentPrice || b.purchasePrice) * b.shares;
+                    // Convert to base currency for accurate comparison
+                    const convertedValueA = convertCurrency(valueA, a.currency, baseCurrency);
+                    const convertedValueB = convertCurrency(valueB, b.currency, baseCurrency);
+                    return convertedValueB - convertedValueA; // Descending order (Highest to Lowest)
+                  })
+                  .map(stock => {
+                    const currentPrice = stock.currentPrice || stock.purchasePrice;
+                    const currentValue = currentPrice * stock.shares;
+                    const purchaseValue = stock.purchasePrice * stock.shares;
+                    const gainLoss = currentValue - purchaseValue;
+                    const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
-                  const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
-                  const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
-                  const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
+                    const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
+                    const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
+                    const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
 
-                  return (
-                    <div key={stock.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
-                          </div>
-                          {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
-                            <div className="text-sm text-gray-500">
-                              Current: {formatCurrency(stock.currentPrice, stock.currency)}
+                    return (
+                      <div key={stock.id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1 min-w-0 mr-2">
+                            <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
                             </div>
-                          )}
-                          <div className="text-lg font-bold text-blue-600 mt-2">
-                            {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
-                          </div>
-                          {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
-                            <div className="mt-2 space-y-1">
-                              <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
-                                ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                            {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                              <div className="text-sm text-gray-500">
+                                Current: {formatCurrency(stock.currentPrice, stock.currency)}
                               </div>
-                              <div className="text-xs text-gray-500">
-                                Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
-                              </div>
+                            )}
+                            <div className="text-lg font-bold text-blue-600 mt-2">
+                              {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
                             </div>
-                          )}
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit('stock', stock)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete('stock', stock.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 size={18} />
-                          </button>
+                            {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
+                              <div className="mt-2 space-y-1">
+                                <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                  {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
+                                  ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEdit('stock', stock)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete('stock', stock.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             );
           }
