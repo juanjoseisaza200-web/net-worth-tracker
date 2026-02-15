@@ -19,6 +19,9 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
   const [isCloudSynced, setIsCloudSynced] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -68,9 +71,11 @@ function App() {
   }, []); // Only run on mount, but depends on load functions
 
   // User Actions -> Cloud Save
-  const handleCloudSave = (newData: AppData) => {
+  const handleCloudSave = async (newData: AppData) => {
+    // 1. Optimistic Update (Local)
     setData(newData);
     saveData(newData);
+
     if (user) {
       // CRITICAL SAFETY GUARD:
       // Prevent overwriting cloud data if we haven't successfully synced yet.
@@ -80,7 +85,18 @@ function App() {
         console.warn("BLOCKED: Attempted to save to cloud before initial sync to prevent data loss.");
         return;
       }
-      saveDataToCloud(user.uid, newData);
+
+      try {
+        setIsSaving(true);
+        setSaveError(null);
+        await saveDataToCloud(user.uid, newData);
+        setLastSaved(new Date());
+      } catch (err) {
+        console.error("Save failed", err);
+        setSaveError("Failed to save to cloud. Please check internet connection.");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -105,7 +121,17 @@ function App() {
 
   const handleManualSync = async () => {
     if (user) {
-      await saveDataToCloud(user.uid, data);
+      try {
+        setIsSaving(true);
+        setSaveError(null);
+        await saveDataToCloud(user.uid, data);
+        setLastSaved(new Date());
+      } catch (err) {
+        console.error("Manual sync failed", err);
+        setSaveError("Failed to sync. Please check connection.");
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -141,8 +167,28 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="min-h-screen bg-gray-50 pb-20 relative">
         {user && <Header user={user} />}
+
+        {/* Save Status Indicator */}
+        <div className="fixed top-4 right-4 z-50 flex flex-col items-end pointer-events-none">
+          {isSaving && (
+            <div className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-pulse">
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              Saving...
+            </div>
+          )}
+          {!isSaving && lastSaved && !saveError && (
+            <div className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full shadow border border-green-200 opacity-75 transition-opacity duration-1000">
+              Saved ✅
+            </div>
+          )}
+          {saveError && (
+            <div className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full shadow border border-red-200 flex items-center gap-1">
+              ⚠️ {saveError}
+            </div>
+          )}
+        </div>
 
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>

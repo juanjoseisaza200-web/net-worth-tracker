@@ -66,6 +66,7 @@ export const saveDataToCloud = async (userId: string, data: AppData): Promise<vo
     await setDoc(doc(db, "users", userId), data);
   } catch (error) {
     console.error("Error saving data to cloud:", error);
+    throw error; // Re-throw to allow caller to handle UI feedback
   }
 };
 
