@@ -184,8 +184,8 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                     data={chartData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={60}
-                    outerRadius={80}
+                    innerRadius={40}
+                    outerRadius={60}
                     paddingAngle={5}
                     dataKey="value"
                     label={({ value }: any) => formatCompactCurrency(value, baseCurrency)}
