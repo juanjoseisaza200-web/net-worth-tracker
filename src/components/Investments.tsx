@@ -1007,7 +1007,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   return (
     <div
-      className="p-4 space-y-4 pb-24 relative"
+      className="p-4 pt-24 space-y-4 pb-24 relative min-h-screen"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
@@ -1105,7 +1105,25 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     outerRadius={60}
                     paddingAngle={5}
                     dataKey="value"
-                    label={({ value }: any) => formatCompactCurrency(value, baseCurrency)}
+                    label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, value }: any) => {
+                      const RADIAN = Math.PI / 180;
+                      const radius = outerRadius + 25; // Push label further out
+                      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+                      return (
+                        <text
+                          x={x}
+                          y={y}
+                          fill="#374151"
+                          textAnchor={x > cx ? 'start' : 'end'}
+                          dominantBaseline="central"
+                          fontSize={11}
+                        >
+                          {`${(percent * 100).toFixed(0)}%`}
+                        </text>
+                      );
+                    }}
                   >
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
