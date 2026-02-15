@@ -188,6 +188,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                     outerRadius={80}
                     paddingAngle={5}
                     dataKey="value"
+                    label={({ value }: any) => formatCompactCurrency(value, baseCurrency)}
                   >
                     {chartData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
