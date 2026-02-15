@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { User } from 'firebase/auth';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, PieChart as PieIcon } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
@@ -1046,6 +1047,89 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             </select>
           </div>
         </div>
+      </div>
+
+      {/* Portfolio Allocation Chart */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <PieIcon size={20} className="mr-2" />
+          Portfolio Allocation
+        </h2>
+        {(() => {
+          // Calculate totals for each asset class
+          // 1. Stocks
+          const stocksTotal = data.stocks.reduce((acc, stock) => {
+            const value = stock.shares * (stock.currentPrice || stock.purchasePrice);
+            return acc + convertCurrency(value, stock.currency, baseCurrency);
+          }, 0);
+
+          // 2. Crypto
+          const cryptoTotal = data.crypto.reduce((acc, coin) => {
+            const value = coin.amount * (coin.currentPrice || coin.purchasePrice);
+            return acc + convertCurrency(value, coin.currency, baseCurrency);
+          }, 0);
+
+          // 3. Fixed Income
+          const fixedTotal = data.fixedIncome.reduce((acc, item) => {
+            return acc + convertCurrency(item.amount, item.currency, baseCurrency);
+          }, 0);
+
+          // 4. Variable Investments
+          const variableTotal = data.variableInvestments.reduce((acc, item) => {
+            const value = item.currentValue || item.amount;
+            return acc + convertCurrency(value, item.currency, baseCurrency);
+          }, 0);
+
+          const totalPortfolioValue = stocksTotal + cryptoTotal + fixedTotal + variableTotal;
+
+          if (totalPortfolioValue === 0) {
+            return <p className="text-gray-500 text-center py-8">Add investments to see your allocation</p>;
+          }
+
+          const chartData = [
+            { name: 'Stocks', value: stocksTotal, color: '#3B82F6' }, // Blue
+            { name: 'Crypto', value: cryptoTotal, color: '#8B5CF6' }, // Purple
+            { name: 'Fixed Income', value: fixedTotal, color: '#10B981' }, // Green
+            { name: 'Variable', value: variableTotal, color: '#F59E0B' }, // Yellow
+          ].filter(item => item.value > 0);
+
+          return (
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={60}
+                    paddingAngle={5}
+                    dataKey="value"
+                    label={({ value }: any) => formatCompactCurrency(value, baseCurrency)}
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: any) => {
+                      if (Array.isArray(value) && value.length > 0) return formatCompactCurrency(Number(value[0]), baseCurrency);
+                      if (typeof value === 'number') return formatCompactCurrency(value, baseCurrency);
+                      return formatCompactCurrency(0, baseCurrency);
+                    }}
+                    contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                  />
+                  <Legend
+                    layout="vertical"
+                    verticalAlign="middle"
+                    align="right"
+                    wrapperStyle={{ fontSize: '12px' }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Tabs */}
