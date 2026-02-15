@@ -194,9 +194,10 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number | string | Array<number | string>) => {
-                      const numValue = Number(Array.isArray(value) ? value[0] : value);
-                      return formatCompactCurrency(numValue, baseCurrency);
+                    formatter={(value: any) => {
+                      if (Array.isArray(value) && value.length > 0) return formatCompactCurrency(Number(value[0]), baseCurrency);
+                      if (typeof value === 'number') return formatCompactCurrency(value, baseCurrency);
+                      return formatCompactCurrency(0, baseCurrency);
                     }}
                     contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                   />

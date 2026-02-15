@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Mobile app for expense tracking and net worth management",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
