@@ -1010,7 +1010,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   return (
     <div
-      className="p-4 pt-24 space-y-4 pb-24 relative min-h-screen"
+      className="p-4 space-y-4 pb-24 relative min-h-screen touch-pan-y"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
