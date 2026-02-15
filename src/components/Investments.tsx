@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
 import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, PieChart as PieIcon } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
@@ -30,7 +30,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   // Pull-to-Refresh State
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [pullStartY, setPullStartY] = useState(0);
+  const pullStartY = useRef(0);
   const [pullDistance, setPullDistance] = useState(0);
   const PULL_THRESHOLD = 80; // Pixels to pull down to trigger refresh
 
@@ -421,18 +421,21 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   // Touch Handlers for Pull-to-Refresh
   const handleTouchStart = (e: React.TouchEvent) => {
+    // Only track if we are at the top of the page
     if (window.scrollY === 0) {
-      setPullStartY(e.touches[0].clientY);
+      pullStartY.current = e.touches[0].clientY;
     }
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (pullStartY > 0 && window.scrollY === 0) {
+    if (pullStartY.current > 0 && window.scrollY === 0) {
       const currentY = e.touches[0].clientY;
-      const diff = currentY - pullStartY;
-      if (diff > 0) {
+      const diff = currentY - pullStartY.current;
+
+      // Add a deadzone of 10px so simple taps/micro-drags don't trigger state updates (re-renders)
+      if (diff > 10) {
         // Add resistance to the pull
-        setPullDistance(Math.min(diff * 0.5, 120));
+        setPullDistance(Math.min((diff - 10) * 0.5, 120));
       }
     }
   };
@@ -441,7 +444,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     if (pullDistance > PULL_THRESHOLD) {
       refreshPrices(true); // Trigger manual refresh
     }
-    setPullStartY(0);
+    pullStartY.current = 0;
     setPullDistance(0);
   };
 
