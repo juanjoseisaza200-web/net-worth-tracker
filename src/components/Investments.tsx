@@ -780,7 +780,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 <input
                   type="text"
                   inputMode="decimal"
-                  pattern="[0-9]*"
+
                   lang="en-US"
                   value={cryptoForm.currentPrice}
                   onChange={(e) => {
