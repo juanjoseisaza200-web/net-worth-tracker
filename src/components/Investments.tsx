@@ -109,30 +109,36 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
 
     if (editingItem && editingItem.type === 'stock') {
-      setData({
-        ...data,
-        stocks: data.stocks.map(s =>
-          s.id === editingItem.id
-            ? {
-              ...s,
-              symbol: stockForm.symbol,
-              shares: shares,
-              purchasePrice: purchasePrice,
-              currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
-              currency: stockForm.currency,
-            }
-            : s
-        ),
+      const updatedList = data.stocks.map(s => {
+        if (s.id === editingItem.id) {
+          const updated: Stock = {
+            ...s,
+            symbol: stockForm.symbol,
+            shares: shares,
+            purchasePrice: purchasePrice,
+            currency: stockForm.currency,
+          };
+          if (stockForm.currentPrice) {
+            updated.currentPrice = parseFloat(stockForm.currentPrice);
+          } else {
+            delete updated.currentPrice;
+          }
+          return updated;
+        }
+        return s;
       });
+      setData({ ...data, stocks: updatedList });
     } else {
       const newStock: Stock = {
         id: Date.now().toString(),
         symbol: stockForm.symbol.toUpperCase(),
         shares: shares,
         purchasePrice: purchasePrice,
-        currentPrice: stockForm.currentPrice ? parseFloat(stockForm.currentPrice) : undefined,
         currency: stockForm.currency,
       };
+      if (stockForm.currentPrice) {
+        newStock.currentPrice = parseFloat(stockForm.currentPrice);
+      }
       setData({ ...data, stocks: [...data.stocks, newStock] });
     }
     resetForms();
@@ -157,30 +163,36 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
 
     if (editingItem && editingItem.type === 'crypto') {
-      setData({
-        ...data,
-        crypto: data.crypto.map(c =>
-          c.id === editingItem.id
-            ? {
-              ...c,
-              symbol: cryptoForm.symbol.toUpperCase(),
-              amount: amount,
-              purchasePrice: purchasePrice,
-              currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
-              currency: cryptoForm.currency,
-            }
-            : c
-        ),
+      const updatedList = data.crypto.map(c => {
+        if (c.id === editingItem.id) {
+          const updated: Crypto = {
+            ...c,
+            symbol: cryptoForm.symbol.toUpperCase(),
+            amount: amount,
+            purchasePrice: purchasePrice,
+            currency: cryptoForm.currency,
+          };
+          if (cryptoForm.currentPrice) {
+            updated.currentPrice = parseFloat(cryptoForm.currentPrice);
+          } else {
+            delete updated.currentPrice;
+          }
+          return updated;
+        }
+        return c;
       });
+      setData({ ...data, crypto: updatedList });
     } else {
       const newCrypto: Crypto = {
         id: Date.now().toString(),
         symbol: cryptoForm.symbol.toUpperCase(),
         amount: amount,
         purchasePrice: purchasePrice,
-        currentPrice: cryptoForm.currentPrice ? parseFloat(cryptoForm.currentPrice) : undefined,
         currency: cryptoForm.currency,
       };
+      if (cryptoForm.currentPrice) {
+        newCrypto.currentPrice = parseFloat(cryptoForm.currentPrice);
+      }
       setData({ ...data, crypto: [...data.crypto, newCrypto] });
     }
     resetForms();
@@ -189,30 +201,36 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const handleFixedSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingItem && editingItem.type === 'fixed') {
-      setData({
-        ...data,
-        fixedIncome: data.fixedIncome.map(f =>
-          f.id === editingItem.id
-            ? {
-              ...f,
-              name: fixedForm.name,
-              amount: parseFloat(fixedForm.amount),
-              interestRate: parseFloat(fixedForm.interestRate),
-              maturityDate: fixedForm.maturityDate || undefined,
-              currency: fixedForm.currency,
-            }
-            : f
-        ),
+      const updatedList = data.fixedIncome.map(f => {
+        if (f.id === editingItem.id) {
+          const updated: FixedIncome = {
+            ...f,
+            name: fixedForm.name,
+            amount: parseFloat(fixedForm.amount),
+            interestRate: parseFloat(fixedForm.interestRate),
+            currency: fixedForm.currency,
+          };
+          if (fixedForm.maturityDate) {
+            updated.maturityDate = fixedForm.maturityDate;
+          } else {
+            delete updated.maturityDate; // Remove if empty to avoid undefined
+          }
+          return updated;
+        }
+        return f;
       });
+      setData({ ...data, fixedIncome: updatedList });
     } else {
       const newFixed: FixedIncome = {
         id: Date.now().toString(),
         name: fixedForm.name,
         amount: parseFloat(fixedForm.amount),
         interestRate: parseFloat(fixedForm.interestRate),
-        maturityDate: fixedForm.maturityDate || undefined,
         currency: fixedForm.currency,
       };
+      if (fixedForm.maturityDate) {
+        newFixed.maturityDate = fixedForm.maturityDate;
+      }
       setData({ ...data, fixedIncome: [...data.fixedIncome, newFixed] });
     }
     resetForms();
@@ -221,29 +239,35 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const handleVariableSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingItem && editingItem.type === 'variable') {
-      setData({
-        ...data,
-        variableInvestments: data.variableInvestments.map(v =>
-          v.id === editingItem.id
-            ? {
-              ...v,
-              name: variableForm.name,
-              amount: parseFloat(variableForm.amount),
-              currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
-              currency: variableForm.currency,
-            }
-            : v
-        ),
+      const updatedList = data.variableInvestments.map(v => {
+        if (v.id === editingItem.id) {
+          const updated: VariableInvestment = {
+            ...v,
+            name: variableForm.name,
+            amount: parseFloat(variableForm.amount),
+            currency: variableForm.currency,
+          };
+          if (variableForm.currentValue) {
+            updated.currentValue = parseFloat(variableForm.currentValue);
+          } else {
+            delete updated.currentValue;
+          }
+          return updated;
+        }
+        return v;
       });
+      setData({ ...data, variableInvestments: updatedList });
     } else {
       const newVariable: VariableInvestment = {
         id: Date.now().toString(),
         name: variableForm.name,
         amount: parseFloat(variableForm.amount),
-        currentValue: variableForm.currentValue ? parseFloat(variableForm.currentValue) : undefined,
         currency: variableForm.currency,
         type: 'other',
       };
+      if (variableForm.currentValue) {
+        newVariable.currentValue = parseFloat(variableForm.currentValue);
+      }
       setData({ ...data, variableInvestments: [...data.variableInvestments, newVariable] });
     }
     resetForms();
