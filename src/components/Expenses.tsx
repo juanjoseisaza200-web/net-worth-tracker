@@ -30,6 +30,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     description: '',
     category: 'Other',
     date: new Date().toISOString().split('T')[0],
+    accountId: data.accounts?.[0]?.id || '',
   });
 
   const [incomeForm, setIncomeForm] = useState({
@@ -38,6 +39,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     description: '',
     category: 'Salary',
     date: new Date().toISOString().split('T')[0],
+    accountId: data.accounts?.[0]?.id || '',
   });
 
   const [recurringForm, setRecurringForm] = useState({
@@ -47,14 +49,32 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     category: 'Salary',
     dayOfMonth: 1,
     isActive: true,
+    accountId: data.accounts?.[0]?.id || '',
   });
 
   const handleExpenseSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!expenseForm.accountId) return; // Require account
+
+    let newAccounts = [...(data.accounts || [])];
 
     if (editingExpense) {
+      newAccounts = newAccounts.map(acc => {
+        let newBalance = acc.balance;
+        if (acc.id === editingExpense.accountId) {
+          // Refund old account
+          newBalance += convertCurrency(editingExpense.amount, editingExpense.currency, acc.currency);
+        }
+        if (acc.id === expenseForm.accountId) {
+          // Deduct new account
+          newBalance -= convertCurrency(parseFloat(expenseForm.amount), expenseForm.currency, acc.currency);
+        }
+        return { ...acc, balance: newBalance };
+      });
+
       setData({
         ...data,
+        accounts: newAccounts,
         expenses: data.expenses.map(exp =>
           exp.id === editingExpense.id
             ? { ...expenseForm, id: exp.id, amount: parseFloat(expenseForm.amount) }
@@ -70,9 +90,19 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         description: expenseForm.description,
         category: expenseForm.category,
         date: expenseForm.date,
+        accountId: expenseForm.accountId,
       };
+
+      newAccounts = newAccounts.map(acc => {
+        if (acc.id === expenseForm.accountId) {
+          return { ...acc, balance: acc.balance - convertCurrency(newExpense.amount, newExpense.currency, acc.currency) };
+        }
+        return acc;
+      });
+
       setData({
         ...data,
+        accounts: newAccounts,
         expenses: [...data.expenses, newExpense],
       });
     }
@@ -83,16 +113,34 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: '',
       category: 'Other',
       date: new Date().toISOString().split('T')[0],
+      accountId: data.accounts?.[0]?.id || '',
     });
     setShowForm(false);
   };
 
   const handleIncomeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!incomeForm.accountId) return; // Require account
+
+    let newAccounts = [...(data.accounts || [])];
 
     if (editingIncome) {
+      newAccounts = newAccounts.map(acc => {
+        let newBalance = acc.balance;
+        if (acc.id === editingIncome.accountId) {
+          // Refund (deduct) old account
+          newBalance -= convertCurrency(editingIncome.amount, editingIncome.currency, acc.currency);
+        }
+        if (acc.id === incomeForm.accountId) {
+          // Add to new account
+          newBalance += convertCurrency(parseFloat(incomeForm.amount), incomeForm.currency, acc.currency);
+        }
+        return { ...acc, balance: newBalance };
+      });
+
       setData({
         ...data,
+        accounts: newAccounts,
         incomes: data.incomes.map(inc =>
           inc.id === editingIncome.id
             ? { ...incomeForm, id: inc.id, amount: parseFloat(incomeForm.amount) }
@@ -108,9 +156,19 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         description: incomeForm.description,
         category: incomeForm.category,
         date: incomeForm.date,
+        accountId: incomeForm.accountId,
       };
+
+      newAccounts = newAccounts.map(acc => {
+        if (acc.id === incomeForm.accountId) {
+          return { ...acc, balance: acc.balance + convertCurrency(newIncome.amount, newIncome.currency, acc.currency) };
+        }
+        return acc;
+      });
+
       setData({
         ...data,
+        accounts: newAccounts,
         incomes: [...data.incomes, newIncome],
       });
     }
@@ -121,6 +179,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: '',
       category: 'Salary',
       date: new Date().toISOString().split('T')[0],
+      accountId: data.accounts?.[0]?.id || '',
     });
     setShowForm(false);
   };
@@ -147,6 +206,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         category: recurringForm.category,
         dayOfMonth: recurringForm.dayOfMonth,
         isActive: recurringForm.isActive,
+        accountId: recurringForm.accountId,
       };
       setData({
         ...data,
@@ -161,6 +221,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       category: 'Salary',
       dayOfMonth: 1,
       isActive: true,
+      accountId: data.accounts?.[0]?.id || '',
     });
     setShowForm(false);
   };
@@ -173,6 +234,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: expense.description,
       category: expense.category,
       date: expense.date,
+      accountId: expense.accountId,
     });
     setViewMode('expenses');
     setShowForm(true);
@@ -186,6 +248,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: income.description,
       category: income.category,
       date: income.date,
+      accountId: income.accountId,
     });
     setViewMode('income');
     setShowForm(true);
@@ -200,6 +263,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       category: recurring.category,
       dayOfMonth: recurring.dayOfMonth,
       isActive: recurring.isActive,
+      accountId: recurring.accountId || data.accounts?.[0]?.id || '',
     });
     setViewMode('recurring');
     setShowForm(true);
@@ -207,8 +271,16 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
   const handleDeleteExpense = (id: string) => {
     if (confirm('Are you sure you want to delete this expense?')) {
+      const expenseToDelete = data.expenses.find(e => e.id === id);
+      const newAccounts = (data.accounts || []).map(acc => {
+        if (expenseToDelete && acc.id === expenseToDelete.accountId) {
+          return { ...acc, balance: acc.balance + convertCurrency(expenseToDelete.amount, expenseToDelete.currency, acc.currency) };
+        }
+        return acc;
+      });
       setData({
         ...data,
+        accounts: newAccounts,
         expenses: data.expenses.filter(exp => exp.id !== id),
       });
     }
@@ -216,8 +288,16 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
   const handleDeleteIncome = (id: string) => {
     if (confirm('Are you sure you want to delete this income?')) {
+      const incomeToDelete = data.incomes.find(i => i.id === id);
+      const newAccounts = (data.accounts || []).map(acc => {
+        if (incomeToDelete && acc.id === incomeToDelete.accountId) {
+          return { ...acc, balance: acc.balance - convertCurrency(incomeToDelete.amount, incomeToDelete.currency, acc.currency) };
+        }
+        return acc;
+      });
       setData({
         ...data,
+        accounts: newAccounts,
         incomes: data.incomes.filter(inc => inc.id !== id),
       });
     }
@@ -255,6 +335,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: '',
       category: 'Other',
       date: new Date().toISOString().split('T')[0],
+      accountId: data.accounts?.[0]?.id || '',
     });
     setIncomeForm({
       amount: '',
@@ -262,6 +343,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       description: '',
       category: 'Salary',
       date: new Date().toISOString().split('T')[0],
+      accountId: data.accounts?.[0]?.id || '',
     });
     setRecurringForm({
       amount: '',
@@ -270,6 +352,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       category: 'Salary',
       dayOfMonth: 1,
       isActive: true,
+      accountId: data.accounts?.[0]?.id || '',
     });
     setEditingExpense(null);
     setEditingIncome(null);
@@ -297,6 +380,20 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 placeholder="What did you spend on?"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+              <select
+                required
+                value={expenseForm.accountId}
+                onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="" disabled>Select Account</option>
+                {data.accounts?.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
+                ))}
+              </select>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -385,6 +482,20 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 placeholder="Salary, Freelance, etc."
               />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+              <select
+                required
+                value={incomeForm.accountId}
+                onChange={(e) => setIncomeForm({ ...incomeForm, accountId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="" disabled>Select Account</option>
+                {data.accounts?.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
@@ -470,6 +581,19 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Monthly Salary, Rent, etc."
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+            <select
+              value={recurringForm.accountId}
+              onChange={(e) => setRecurringForm({ ...recurringForm, accountId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="">No specific account</option>
+              {data.accounts?.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

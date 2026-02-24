@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, TrendingUp, DollarSign } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Building2 } from 'lucide-react';
 import Dashboard from './components/Dashboard';
+import Accounts from './components/Accounts';
 import Expenses from './components/Expenses';
 import Investments from './components/Investments';
 import { AppData, Currency } from './types';
@@ -195,6 +196,7 @@ function App() {
             <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
+            <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>
         </main>
@@ -209,6 +211,7 @@ function Navigation() {
 
   const navItems = [
     { path: '/', icon: Wallet, label: 'Dashboard' },
+    { path: '/accounts', icon: Building2, label: 'Accounts' },
     { path: '/expenses', icon: DollarSign, label: 'Expenses' },
     { path: '/investments', icon: TrendingUp, label: 'Investments' },
   ];

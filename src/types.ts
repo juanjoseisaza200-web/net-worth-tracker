@@ -1,5 +1,15 @@
 export type Currency = 'USD' | 'COP' | 'EUR' | 'GBP' | 'JPY' | 'CAD' | 'AUD';
 
+export type AccountType = 'checking' | 'savings' | 'cash' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  balance: number;
+  currency: Currency;
+  type: AccountType;
+}
+
 export interface Expense {
   id: string;
   amount: number;
@@ -7,6 +17,7 @@ export interface Expense {
   description: string;
   category: string;
   date: string;
+  accountId: string;
 }
 
 export interface Income {
@@ -16,6 +27,7 @@ export interface Income {
   description: string;
   category: string;
   date: string;
+  accountId: string;
 }
 
 export interface RecurringIncome {
@@ -26,6 +38,7 @@ export interface RecurringIncome {
   category: string;
   dayOfMonth: number; // 1-31, the day of the month when income is received
   isActive: boolean;
+  accountId?: string;
 }
 
 export interface Stock {
@@ -65,6 +78,7 @@ export interface VariableInvestment {
 }
 
 export interface AppData {
+  accounts: Account[];
   expenses: Expense[];
   incomes: Income[];
   recurringIncomes: RecurringIncome[];

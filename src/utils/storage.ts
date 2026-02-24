@@ -1,8 +1,10 @@
-import { AppData, Currency } from '../types';
+import { AppData, Currency, Account } from '../types';
+import { calculateTotalExpenses, calculateTotalIncome } from './calculations';
 
 const STORAGE_KEY = 'net-worth-tracker-data';
 
 const defaultData: AppData = {
+  accounts: [],
   expenses: [],
   incomes: [],
   recurringIncomes: [],
@@ -16,6 +18,39 @@ const defaultData: AppData = {
   },
 };
 
+const migrateData = (data: any): AppData => {
+  if (!data.incomes) data.incomes = [];
+  if (!data.recurringIncomes) data.recurringIncomes = [];
+  if (!data.expenses) data.expenses = [];
+
+  if (!data.accounts) {
+    const defaultAccountId = 'default-checking-' + Date.now();
+    const baseCurr = data.baseCurrency || 'USD';
+
+    // Calculate historical balance
+    const totalIncome = calculateTotalIncome(data as AppData, baseCurr);
+    const totalExpenses = calculateTotalExpenses(data as AppData, baseCurr);
+    const initialBalance = totalIncome - totalExpenses;
+
+    const defaultAccount: Account = {
+      id: defaultAccountId,
+      name: 'Main Checking',
+      balance: initialBalance,
+      currency: baseCurr,
+      type: 'checking'
+    };
+
+    data.accounts = [defaultAccount];
+
+    // Assign historical transactions
+    if (Array.isArray(data.expenses)) data.expenses.forEach((e: any) => e.accountId = defaultAccountId);
+    if (Array.isArray(data.incomes)) data.incomes.forEach((i: any) => i.accountId = defaultAccountId);
+    if (Array.isArray(data.recurringIncomes)) data.recurringIncomes.forEach((r: any) => r.accountId = defaultAccountId);
+  }
+
+  return data as AppData;
+};
+
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -24,10 +59,7 @@ export const loadData = (): AppData => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const data = JSON.parse(stored);
-      // Migrate old data to include new fields
-      if (!data.incomes) data.incomes = [];
-      if (!data.recurringIncomes) data.recurringIncomes = [];
-      return data;
+      return migrateData(data);
     }
   } catch (error) {
     console.error('Error loading data:', error);
@@ -49,11 +81,8 @@ export const loadDataFromCloud = async (userId: string): Promise<AppData | null>
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      const data = docSnap.data() as AppData;
-      // Ensure fields exist
-      if (!data.incomes) data.incomes = [];
-      if (!data.recurringIncomes) data.recurringIncomes = [];
-      return data;
+      const data = docSnap.data();
+      return migrateData(data);
     }
   } catch (error) {
     console.error("Error loading data from cloud:", error);
@@ -74,11 +103,8 @@ export const subscribeToData = (userId: string, onDataChange: (data: AppData) =>
   const docRef = doc(db, "users", userId);
   const unsubscribe = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
-      const data = docSnap.data() as AppData;
-      // Ensure fields exist
-      if (!data.incomes) data.incomes = [];
-      if (!data.recurringIncomes) data.recurringIncomes = [];
-      onDataChange(data);
+      const data = docSnap.data();
+      onDataChange(migrateData(data));
     }
   }, (error) => {
     console.error("Error subscribing to data:", error);

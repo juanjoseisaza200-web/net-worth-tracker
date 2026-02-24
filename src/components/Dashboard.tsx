@@ -82,6 +82,26 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
         </div>
       </div>
 
+      {/* Cash Accounts Summary */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          Cash Accounts
+        </h2>
+        <div className="grid grid-cols-2 gap-4">
+          {(data.accounts || []).slice(0, 4).map(acc => (
+            <div key={acc.id} className="bg-indigo-50 rounded-lg p-3 overflow-hidden">
+              <div className="text-sm text-gray-600 truncate">{acc.name}</div>
+              <div className="text-xl font-bold text-indigo-600 truncate">
+                {formatCompactCurrency(acc.balance, acc.currency)}
+              </div>
+            </div>
+          ))}
+          {(!data.accounts || data.accounts.length === 0) && (
+            <div className="col-span-2 text-center text-gray-500 py-2">No accounts added yet.</div>
+          )}
+        </div>
+      </div>
+
       {/* Investment Summary */}
       <div className="bg-white rounded-lg shadow p-4">
         <h2 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">

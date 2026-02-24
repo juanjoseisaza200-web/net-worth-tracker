@@ -4,6 +4,13 @@ import { convertCurrency } from './currency';
 export const calculateNetWorth = (data: AppData, targetCurrency: Currency): number => {
   let total = 0;
 
+  // Calculate accounts value (Cash)
+  if (data.accounts) {
+    data.accounts.forEach(acc => {
+      total += convertCurrency(acc.balance, acc.currency, targetCurrency);
+    });
+  }
+
   // Calculate stocks value
   data.stocks.forEach(stock => {
     const value = (stock.currentPrice || stock.purchasePrice) * stock.shares;
