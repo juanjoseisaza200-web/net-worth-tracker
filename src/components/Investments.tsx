@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { User } from 'firebase/auth';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, Building2 } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -60,6 +60,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     interestRate: '',
     maturityDate: '',
     currency: 'USD' as Currency,
+    linkedAccountId: '',
   });
 
   const [variableForm, setVariableForm] = useState({
@@ -92,7 +93,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const resetForms = () => {
     setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
     setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
-    setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'USD' });
+    setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'USD', linkedAccountId: '' });
     setVariableForm({ name: '', amount: '', currentValue: '', currency: 'USD' });
     setEditingItem(null);
     setShowForm(false);
@@ -207,13 +208,19 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   const handleFixedSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // If linked, we can set fake static names/amounts since it reads dynamically from the account
+    const isLinked = !!fixedForm.linkedAccountId;
+    const name = isLinked ? 'Linked Account' : fixedForm.name;
+    const amount = isLinked ? 0 : parseFloat(fixedForm.amount);
+
     if (editingItem && editingItem.type === 'fixed') {
       const updatedList = data.fixedIncome.map(f => {
         if (f.id === editingItem.id) {
           const updated: FixedIncome = {
             ...f,
-            name: fixedForm.name,
-            amount: parseFloat(fixedForm.amount),
+            name: name,
+            amount: amount,
             interestRate: parseFloat(fixedForm.interestRate),
             currency: fixedForm.currency,
           };
@@ -221,6 +228,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             updated.maturityDate = fixedForm.maturityDate;
           } else {
             delete updated.maturityDate; // Remove if empty to avoid undefined
+          }
+          if (isLinked) {
+            updated.linkedAccountId = fixedForm.linkedAccountId;
+          } else {
+            delete updated.linkedAccountId;
           }
           return updated;
         }
@@ -230,13 +242,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     } else {
       const newFixed: FixedIncome = {
         id: Date.now().toString(),
-        name: fixedForm.name,
-        amount: parseFloat(fixedForm.amount),
+        name: name,
+        amount: amount,
         interestRate: parseFloat(fixedForm.interestRate),
         currency: fixedForm.currency,
       };
       if (fixedForm.maturityDate) {
         newFixed.maturityDate = fixedForm.maturityDate;
+      }
+      if (isLinked) {
+        newFixed.linkedAccountId = fixedForm.linkedAccountId;
       }
       setData({ ...data, fixedIncome: [...data.fixedIncome, newFixed] });
     }
@@ -315,6 +330,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         interestRate: f.interestRate.toString(),
         maturityDate: f.maturityDate || '',
         currency: f.currency,
+        linkedAccountId: f.linkedAccountId || '',
       });
     } else {
       const v = item as VariableInvestment;
@@ -849,46 +865,63 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           </h2>
           <form onSubmit={handleFixedSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-              <input
-                type="text"
-                required
-                value={fixedForm.name}
-                onChange={(e) => setFixedForm({ ...fixedForm, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                placeholder="Savings Account, Bond, etc."
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Link to Cash Account (Optional)</label>
+              <select
+                value={fixedForm.linkedAccountId}
+                onChange={(e) => setFixedForm({ ...fixedForm, linkedAccountId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">No link (Manual Entry)</option>
+                {data.accounts?.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">If linked, the balance will automatically mirror your cash account.</p>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
-                  lang="en-US"
-                  required
-                  value={fixedForm.amount}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setFixedForm({ ...fixedForm, amount: val });
-                    }
-                  }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select
-                  value={fixedForm.currency}
-                  onChange={(e) => setFixedForm({ ...fixedForm, currency: e.target.value as Currency })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
+            {!fixedForm.linkedAccountId && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={fixedForm.name}
+                    onChange={(e) => setFixedForm({ ...fixedForm, name: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    placeholder="Savings Account, Bond, etc."
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      lang="en-US"
+                      required
+                      value={fixedForm.amount}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(',', '.');
+                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                          setFixedForm({ ...fixedForm, amount: val });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <select
+                      value={fixedForm.currency}
+                      onChange={(e) => setFixedForm({ ...fixedForm, currency: e.target.value as Currency })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    >
+                      {currencies.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
@@ -1186,7 +1219,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
         {activeTab === 'fixed' && data.fixedIncome.length > 0 && (() => {
           const totalValue = data.fixedIncome.reduce((sum, fixed) => {
-            return sum + convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+            let amount = fixed.amount;
+            let currency = fixed.currency;
+            if (fixed.linkedAccountId) {
+              const linkedAccount = data.accounts?.find(a => a.id === fixed.linkedAccountId);
+              if (linkedAccount) {
+                amount = linkedAccount.balance;
+                currency = linkedAccount.currency;
+              }
+            }
+            return sum + convertCurrency(amount, currency, baseCurrency);
           }, 0);
 
           return (
@@ -1394,22 +1436,49 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               return (
                 <div className="divide-y divide-gray-100">
                   {data.fixedIncome.map(fixed => {
-                    const convertedValue = convertCurrency(fixed.amount, fixed.currency, baseCurrency);
+                    let amount = fixed.amount;
+                    let currency = fixed.currency;
+                    let name = fixed.name;
+                    const isLinked = !!fixed.linkedAccountId;
+
+                    if (isLinked) {
+                      const linkedAccount = data.accounts?.find(a => a.id === fixed.linkedAccountId);
+                      if (linkedAccount) {
+                        amount = linkedAccount.balance;
+                        currency = linkedAccount.currency;
+                        name = linkedAccount.name;
+                      } else {
+                        name = "Disconnected Linked Account";
+                      }
+                    }
+
+                    const convertedValue = convertCurrency(amount, currency, baseCurrency);
                     return (
                       <div key={fixed.id} className="p-4">
                         <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0 mr-2">
-                            <div className="font-semibold text-lg text-gray-800 truncate">{fixed.name}</div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              Interest Rate: {fixed.interestRate}%
-                            </div>
-                            {fixed.maturityDate && (
-                              <div className="text-sm text-gray-500">
-                                Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
+                          <div className="flex-1 min-w-0 mr-2 flex gap-3">
+                            {isLinked && (
+                              <div className="flex-shrink-0 pt-1">
+                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
+                                  <Building2 size={24} />
+                                </div>
                               </div>
                             )}
-                            <div className="text-lg font-bold text-green-600 mt-2">
-                              {formatCompactCurrency(convertedValue, baseCurrency)}
+                            <div className="flex-1">
+                              <div className="font-semibold text-lg text-gray-800 truncate flex items-center gap-2">
+                                {name} {isLinked && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-normal">Linked to Cash Acct</span>}
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                Interest Rate: {fixed.interestRate}%
+                              </div>
+                              {fixed.maturityDate && (
+                                <div className="text-sm text-gray-500">
+                                  Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
+                                </div>
+                              )}
+                              <div className="text-lg font-bold text-green-600 mt-2">
+                                {formatCompactCurrency(convertedValue, baseCurrency)}
+                              </div>
                             </div>
                           </div>
                           <div className="flex gap-2">

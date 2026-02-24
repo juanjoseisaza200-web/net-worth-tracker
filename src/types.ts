@@ -66,6 +66,7 @@ export interface FixedIncome {
   interestRate: number;
   maturityDate?: string;
   currency: Currency;
+  linkedAccountId?: string;
 }
 
 export interface VariableInvestment {

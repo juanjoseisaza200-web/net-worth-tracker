@@ -25,7 +25,9 @@ export const calculateNetWorth = (data: AppData, targetCurrency: Currency): numb
 
   // Calculate fixed income value
   data.fixedIncome.forEach(fixed => {
-    total += convertCurrency(fixed.amount, fixed.currency, targetCurrency);
+    if (!fixed.linkedAccountId) {
+      total += convertCurrency(fixed.amount, fixed.currency, targetCurrency);
+    }
   });
 
   // Calculate variable investments value
