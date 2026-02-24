@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Wallet, ArrowRightLeft, Building2, Trash2 } from 'lucide-react';
+import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2 } from 'lucide-react';
 import { AppData, Account, AccountType, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -21,6 +21,7 @@ const accountTypes: { value: AccountType; label: string }[] = [
 export default function Accounts({ data, setData, baseCurrency, onCurrencyChange }: AccountsProps) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [showTransferForm, setShowTransferForm] = useState(false);
+    const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
 
     const [addForm, setAddForm] = useState({
         name: '',
@@ -39,18 +40,38 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const newAccount: Account = {
-            id: Date.now().toString(),
-            name: addForm.name,
-            type: addForm.type,
-            currency: addForm.currency,
-            balance: parseFloat(addForm.balance || '0'),
-        };
 
-        setData({
-            ...data,
-            accounts: [...accounts, newAccount],
-        });
+        if (editingAccountId) {
+            const updatedAccounts = accounts.map(acc =>
+                acc.id === editingAccountId
+                    ? {
+                        ...acc,
+                        name: addForm.name,
+                        type: addForm.type,
+                        currency: addForm.currency,
+                        balance: parseFloat(addForm.balance || '0'),
+                    }
+                    : acc
+            );
+            setData({
+                ...data,
+                accounts: updatedAccounts,
+            });
+            setEditingAccountId(null);
+        } else {
+            const newAccount: Account = {
+                id: Date.now().toString(),
+                name: addForm.name,
+                type: addForm.type,
+                currency: addForm.currency,
+                balance: parseFloat(addForm.balance || '0'),
+            };
+
+            setData({
+                ...data,
+                accounts: [...accounts, newAccount],
+            });
+        }
 
         setAddForm({
             name: '',
@@ -116,6 +137,18 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         }
     };
 
+    const handleEditAccount = (account: Account) => {
+        setEditingAccountId(account.id);
+        setAddForm({
+            name: account.name,
+            type: account.type,
+            currency: account.currency,
+            balance: account.balance.toString(),
+        });
+        setShowAddForm(true);
+        setShowTransferForm(false);
+    };
+
     const totalCashBaseCurrency = accounts.reduce((sum, acc) => {
         return sum + convertCurrency(acc.balance, acc.currency, baseCurrency);
     }, 0);
@@ -145,7 +178,12 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             {/* Actions */}
             <div className="grid grid-cols-2 gap-4 mb-4">
                 <button
-                    onClick={() => { setShowAddForm(true); setShowTransferForm(false); }}
+                    onClick={() => {
+                        setEditingAccountId(null);
+                        setAddForm({ name: '', type: 'checking', currency: 'USD', balance: '' });
+                        setShowAddForm(true);
+                        setShowTransferForm(false);
+                    }}
                     className="bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
                 >
                     <Plus size={20} /> Add Account
@@ -158,10 +196,10 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                 </button>
             </div>
 
-            {/* Add Form */}
+            {/* Add/Edit Form */}
             {showAddForm && (
                 <div className="bg-white rounded-lg shadow p-4 mb-4">
-                    <h2 className="text-lg font-semibold mb-4">Add New Account</h2>
+                    <h2 className="text-lg font-semibold mb-4">{editingAccountId ? 'Edit Account' : 'Add New Account'}</h2>
                     <form onSubmit={handleAddSubmit} className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
@@ -220,9 +258,9 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                         </div>
                         <div className="flex gap-2">
                             <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                                Save Account
+                                {editingAccountId ? 'Update Account' : 'Save Account'}
                             </button>
-                            <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+                            <button type="button" onClick={() => { setShowAddForm(false); setEditingAccountId(null); }} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
                                 Cancel
                             </button>
                         </div>
@@ -309,12 +347,20 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                     <div className="text-sm text-gray-500 capitalize">{account.type}</div>
                                 </div>
                             </div>
-                            <button
-                                onClick={() => handleDeleteAccount(account.id)}
-                                className="p-2 text-gray-400 hover:text-red-600 rounded-lg"
-                            >
-                                <Trash2 size={18} />
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleEditAccount(account)}
+                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                >
+                                    <Edit2 size={18} />
+                                </button>
+                                <button
+                                    onClick={() => handleDeleteAccount(account.id)}
+                                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg"
+                                >
+                                    <Trash2 size={18} />
+                                </button>
+                            </div>
                         </div>
                         <div className="mt-4">
                             <div className="text-2xl font-bold text-gray-900">
