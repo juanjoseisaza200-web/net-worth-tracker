@@ -13,6 +13,8 @@ import Login from './components/Login';
 import Settings from './components/Settings';
 import Header from './components/Header';
 
+import { fetchExchangeRates } from './utils/currency';
+
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
   const [baseCurrency, setBaseCurrency] = useState<Currency>(data.baseCurrency);
@@ -23,6 +25,14 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
+  const [ratesLoaded, setRatesLoaded] = useState(false);
+
+  useEffect(() => {
+    // Fetch live exchange rates on boot
+    fetchExchangeRates().then(() => {
+      setRatesLoaded(true); // Triggers re-render so components use live rates
+    });
+  }, []);
 
   useEffect(() => {
     let mounted = true;

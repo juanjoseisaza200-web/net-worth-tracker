@@ -3,6 +3,7 @@ import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff } from 'lu
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AppData } from '../types';
+import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
 
 interface SettingsProps {
     user: User;
@@ -15,6 +16,7 @@ interface SettingsProps {
 
 export default function Settings({ user, onLogout, onSync, data, setData }: SettingsProps) {
     const [syncing, setSyncing] = useState(false);
+    const [fetchingRates, setFetchingRates] = useState(false);
     const autoUpdatePrices = data.settings?.autoUpdatePrices ?? true;
 
     const toggleAutoUpdate = () => {
@@ -31,6 +33,12 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
         setSyncing(true);
         await onSync();
         setTimeout(() => setSyncing(false), 800);
+    };
+
+    const handleFetchRates = async () => {
+        setFetchingRates(true);
+        await fetchExchangeRates();
+        setTimeout(() => setFetchingRates(false), 800);
     };
 
     return (
@@ -92,6 +100,26 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                             <div className="text-left">
                                 <span className="block font-medium text-gray-900">Sync Data</span>
                                 <span className="block text-xs text-gray-500">Force upload local data to cloud</span>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={handleFetchRates}
+                        disabled={fetchingRates}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-full ${isUsingLiveRates ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'} ${fetchingRates ? 'animate-spin' : ''}`}>
+                                <RefreshCw size={20} />
+                            </div>
+                            <div className="text-left">
+                                <span className="block font-medium text-gray-900">Exchange Rates</span>
+                                <span className="block text-xs text-gray-500">
+                                    {isUsingLiveRates 
+                                        ? `Live (Updated ${lastExchangeRatesUpdate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` 
+                                        : 'Using hardcoded fallbacks'}
+                                </span>
                             </div>
                         </div>
                     </button>

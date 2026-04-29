@@ -74,20 +74,41 @@ export const formatAdaptiveCurrency = (amount: number, currency: Currency): stri
   return formatCompactCurrency(amount, currency);
 };
 
-// Function to fetch real-time exchange rates (placeholder for API integration)
-export const fetchExchangeRates = async (): Promise<void> => {
+export let lastExchangeRatesUpdate: Date | null = null;
+export let isUsingLiveRates: boolean = false;
+
+// Function to fetch real-time exchange rates
+export const fetchExchangeRates = async (): Promise<boolean> => {
   try {
-    // Example API call (uncomment and configure when ready):
-    // const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-    // const data = await response.json();
-    // Object.keys(exchangeRates).forEach(currency => {
-    //   if (data.rates[currency]) {
-    //     exchangeRates[currency] = 1 / data.rates[currency];
-    //   }
-    // });
-    console.log('Exchange rates updated');
+    const response = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (!response.ok) throw new Error('Network response was not ok');
+    
+    const data = await response.json();
+    if (data && data.rates) {
+      Object.keys(exchangeRates).forEach(currency => {
+        if (data.rates[currency]) {
+          // The API provides rates relative to USD.
+          // Since our exchangeRates object stores 1 USD = X Currency, 
+          // we can just map it directly. Wait, our hardcoded COP is 0.00024.
+          // That implies our exchangeRates meant 1 COP = 0.00024 USD!
+          // Let's check `convertCurrency` logic!
+          // `usdAmount = amount * exchangeRates[from]`
+          // `return usdAmount / exchangeRates[to]`
+          // Ah! If `exchangeRates` stores the value of 1 unit in USD...
+          // But the API returns 1 USD = 3637 COP. So 1 COP = 1 / 3637 USD.
+          exchangeRates[currency as Currency] = 1 / data.rates[currency];
+        }
+      });
+      lastExchangeRatesUpdate = new Date();
+      isUsingLiveRates = true;
+      console.log('Exchange rates updated live from open.er-api.com');
+      return true;
+    }
+    return false;
   } catch (error) {
-    console.error('Error fetching exchange rates:', error);
+    console.error('Error fetching live exchange rates, falling back to hardcoded rates:', error);
+    isUsingLiveRates = false;
+    return false;
   }
 };
 
