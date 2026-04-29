@@ -167,7 +167,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     const handleAutomationSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         
-        const newAutomation: Automation = {
+        const newAutomation: any = {
             id: editingAutomationId || Date.now().toString(),
             name: automationForm.name,
             type: automationForm.type,
@@ -175,22 +175,30 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             destinationAccountId: automationForm.destinationAccountId,
             dayOfMonth: automationForm.dayOfMonth,
             isActive: automationForm.isActive,
-            amount: automationForm.type === 'transfer' ? parseFloat(automationForm.amount || '0') : undefined,
-            keepAmount: automationForm.type === 'sweep' ? parseFloat(automationForm.keepAmount || '0') : undefined,
-            lastRunMonth: editingAutomationId ? data.automations?.find(a => a.id === editingAutomationId)?.lastRunMonth : undefined,
         };
+
+        if (automationForm.type === 'transfer') {
+            newAutomation.amount = parseFloat(automationForm.amount || '0');
+        } else if (automationForm.type === 'sweep') {
+            newAutomation.keepAmount = parseFloat(automationForm.keepAmount || '0');
+        }
+
+        const prevLastRunMonth = editingAutomationId ? data.automations?.find(a => a.id === editingAutomationId)?.lastRunMonth : undefined;
+        if (prevLastRunMonth !== undefined) {
+            newAutomation.lastRunMonth = prevLastRunMonth;
+        }
 
         const existingAutomations = data.automations || [];
         
         if (editingAutomationId) {
             setData({
                 ...data,
-                automations: existingAutomations.map(a => a.id === editingAutomationId ? newAutomation : a)
+                automations: existingAutomations.map(a => a.id === editingAutomationId ? newAutomation as Automation : a)
             });
         } else {
             setData({
                 ...data,
-                automations: [...existingAutomations, newAutomation]
+                automations: [...existingAutomations, newAutomation as Automation]
             });
         }
 
