@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2, PlayCircle } from 'lucide-react';
-import { AppData, Account, AccountType, Currency, Automation } from '../types';
+import { AppData, Account, AccountType, Currency, Automation, ActivityLog } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
 interface AccountsProps {
