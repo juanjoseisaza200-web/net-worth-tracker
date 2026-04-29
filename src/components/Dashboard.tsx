@@ -71,7 +71,10 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-gray-900">
-                      {formatCurrency(exposure.convertedValue, baseCurrency)}
+                      {formatCurrency(exposure.nativeValue, exposure.currency)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      ≈ {formatCurrency(exposure.convertedValue, baseCurrency)}
                     </div>
                   </div>
                 </div>
