@@ -35,15 +35,26 @@ function App() {
           if (currentUser) {
             // Subscribe to real-time cloud data
             console.log("Subscribing to cloud data...");
-            subscribeToData(currentUser.uid, (cloudData) => {
+            subscribeToData(currentUser.uid, async (cloudData) => {
               if (mounted) {
                 console.log("Cloud data updated", cloudData);
-                setData(cloudData);
-                // Sync cloud data to local storage so next boot is fresh
-                saveData(cloudData);
-                setBaseCurrency(cloudData.baseCurrency);
-                setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
-                setLoading(false);
+                const { newData, messages } = (await import('./utils/automations')).processAutomations(cloudData);
+                
+                if (messages.length > 0) {
+                  try {
+                    await saveDataToCloud(currentUser.uid, newData);
+                    alert("Automations Ran automatically:\n" + messages.join("\n"));
+                  } catch (e) {
+                    console.error("Failed to save automations", e);
+                  }
+                } else {
+                  setData(cloudData);
+                  // Sync cloud data to local storage so next boot is fresh
+                  saveData(cloudData);
+                  setBaseCurrency(cloudData.baseCurrency);
+                  setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
+                  setLoading(false);
+                }
               }
             });
 

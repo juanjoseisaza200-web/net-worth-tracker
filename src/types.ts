@@ -78,11 +78,25 @@ export interface VariableInvestment {
   type: 'other';
 }
 
+export interface Automation {
+  id: string;
+  name: string;
+  type: 'sweep' | 'transfer';
+  sourceAccountId: string;
+  destinationAccountId: string;
+  amount?: number; // Used only for 'transfer'
+  keepAmount?: number; // Used only for 'sweep' (e.g., leave exactly 7,500 in Checking)
+  dayOfMonth: number; // 1-28, or 0 to represent 'End of Month'
+  isActive: boolean;
+  lastRunMonth?: string; // Format: 'YYYY-MM'
+}
+
 export interface AppData {
   accounts: Account[];
   expenses: Expense[];
   incomes: Income[];
   recurringIncomes: RecurringIncome[];
+  automations?: Automation[];
   stocks: Stock[];
   crypto: Crypto[];
   fixedIncome: FixedIncome[];
