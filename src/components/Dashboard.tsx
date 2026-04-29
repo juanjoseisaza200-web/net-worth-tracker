@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { AppData, Currency } from '../types';
-import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure } from '../utils/calculations';
+import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
 
@@ -21,6 +21,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
 
   const netWorth = calculateNetWorth(data, baseCurrency);
   const currencyExposure = calculateCurrencyExposure(data, baseCurrency);
+  const assetAllocation = calculateAssetAllocation(data, baseCurrency);
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
   const yearlyExpenses = calculateTotalExpenses(data, baseCurrency, 'year');
   const monthlyIncome = calculateTotalIncome(data, baseCurrency, 'month');
@@ -52,6 +53,43 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
           {formatAdaptiveCurrency(netWorth, baseCurrency)}
         </div>
       </div>
+
+      {/* Asset Allocation */}
+      {assetAllocation.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">
+            Asset Allocation
+          </h2>
+          
+          {/* Stacked Bar */}
+          <div className="w-full h-4 rounded-full flex overflow-hidden mb-4 bg-gray-100">
+            {assetAllocation.map(asset => (
+              <div 
+                key={asset.type} 
+                className={asset.color} 
+                style={{ width: `${asset.percentage}%` }}
+                title={`${asset.type}: ${asset.percentage.toFixed(1)}%`}
+              />
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="space-y-2">
+            {assetAllocation.map(asset => (
+              <div key={asset.type} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${asset.color}`}></div>
+                  <span className="font-medium text-gray-700">{asset.type}</span>
+                  <span className="text-gray-500">({asset.percentage.toFixed(1)}%)</span>
+                </div>
+                <div className="font-semibold text-gray-900">
+                  {formatCurrency(asset.value, baseCurrency)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Currency Exposure */}
       {currencyExposure.length > 0 && (

@@ -82,6 +82,45 @@ export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currenc
   return exposureList.sort((a, b) => b.percentage - a.percentage);
 };
 
+export interface AssetAllocation {
+  type: string;
+  value: number;
+  percentage: number;
+  color: string;
+}
+
+export const calculateAssetAllocation = (data: AppData, targetCurrency: Currency): AssetAllocation[] => {
+  let cash = 0;
+  let stocks = 0;
+  let crypto = 0;
+  let fixedIncome = 0;
+  let variable = 0;
+
+  if (data.accounts) {
+    data.accounts.forEach(acc => cash += convertCurrency(acc.balance, acc.currency, targetCurrency));
+  }
+  data.stocks.forEach(s => stocks += convertCurrency((s.currentPrice || s.purchasePrice) * s.shares, s.currency, targetCurrency));
+  data.crypto.forEach(c => crypto += convertCurrency((c.currentPrice || c.purchasePrice) * c.amount, c.currency, targetCurrency));
+  data.fixedIncome.forEach(f => {
+    if (!f.linkedAccountId) {
+      fixedIncome += convertCurrency(f.amount, f.currency, targetCurrency);
+    }
+  });
+  data.variableInvestments.forEach(v => variable += convertCurrency(v.currentValue || v.amount, v.currency, targetCurrency));
+
+  const total = cash + stocks + crypto + fixedIncome + variable;
+  if (total === 0) return [];
+
+  const raw = [
+    { type: 'Cash', value: cash, percentage: (cash / total) * 100, color: 'bg-green-500' },
+    { type: 'Stocks', value: stocks, percentage: (stocks / total) * 100, color: 'bg-blue-500' },
+    { type: 'Crypto', value: crypto, percentage: (crypto / total) * 100, color: 'bg-purple-500' },
+    { type: 'Fixed Income', value: fixedIncome, percentage: (fixedIncome / total) * 100, color: 'bg-orange-500' },
+    { type: 'Other', value: variable, percentage: (variable / total) * 100, color: 'bg-gray-500' },
+  ];
+
+  return raw.filter(a => a.value > 0).sort((a, b) => b.value - a.value);
+};
 
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
