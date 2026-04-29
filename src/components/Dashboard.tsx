@@ -1,5 +1,5 @@
 import React, { useState, DragEvent } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, GripVertical, Check } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { AppData, Currency, DashboardWidgetConfig } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals } from '../utils/currency';
@@ -46,8 +46,6 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
       : DEFAULT_LAYOUT
   );
 
-  const [draggedWidgetId, setDraggedWidgetId] = useState<string | null>(null);
-
   const now = new Date();
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
@@ -80,30 +78,21 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
     setLayout(layout.map(w => w.id === id ? { ...w, visible: !w.visible } : w));
   };
 
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, id: string) => {
-    setDraggedWidgetId(id);
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>, targetId: string) => {
-    e.preventDefault();
-    if (!draggedWidgetId || draggedWidgetId === targetId) return;
+  const moveWidget = (index: number, direction: 'up' | 'down') => {
+    if (direction === 'up' && index === 0) return;
+    if (direction === 'down' && index === layout.length - 1) return;
 
     const newLayout = [...layout];
-    const draggedIndex = newLayout.findIndex(w => w.id === draggedWidgetId);
-    const targetIndex = newLayout.findIndex(w => w.id === targetId);
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    // Swap
+    const temp = newLayout[index];
+    newLayout[index] = newLayout[targetIndex];
+    newLayout[targetIndex] = temp;
 
-    const [draggedItem] = newLayout.splice(draggedIndex, 1);
-    newLayout.splice(targetIndex, 0, draggedItem);
-
-    const reordered = newLayout.map((item, index) => ({ ...item, order: index }));
+    // Update order property
+    const reordered = newLayout.map((item, i) => ({ ...item, order: i }));
     setLayout(reordered);
-    setDraggedWidgetId(null);
   };
 
   const renderWidget = (id: string) => {
@@ -359,21 +348,32 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
       {isEditingLayout ? (
         <div className="bg-white rounded-lg shadow p-4 mb-4">
           <p className="text-sm text-gray-600 mb-4 border-b border-gray-100 pb-3">
-            Drag widgets to reorder them, or click the eye icon to hide them.
+            Use the up and down arrows to reorder widgets, or click the eye icon to hide them.
           </p>
           <div className="space-y-2">
-            {layout.map(widget => (
+            {layout.map((widget, index) => (
               <div 
                 key={widget.id}
-                draggable
-                onDragStart={(e) => handleDragStart(e, widget.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, widget.id)}
-                className={`flex items-center justify-between p-3 rounded-lg border ${draggedWidgetId === widget.id ? 'opacity-50 border-blue-400 bg-blue-50' : 'border-gray-200 bg-gray-50'} cursor-move hover:border-blue-300 transition-colors`}
+                className={`flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-gray-50`}
               >
-                <div className="flex items-center gap-3 pointer-events-none">
-                  <GripVertical size={18} className="text-gray-400" />
-                  <span className={`font-medium ${!widget.visible ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-1">
+                    <button 
+                      onClick={() => moveWidget(index, 'up')}
+                      disabled={index === 0}
+                      className={`p-0.5 rounded ${index === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-200 hover:text-blue-600'}`}
+                    >
+                      <ChevronUp size={16} />
+                    </button>
+                    <button 
+                      onClick={() => moveWidget(index, 'down')}
+                      disabled={index === layout.length - 1}
+                      className={`p-0.5 rounded ${index === layout.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-200 hover:text-blue-600'}`}
+                    >
+                      <ChevronDown size={16} />
+                    </button>
+                  </div>
+                  <span className={`font-medium ml-2 ${!widget.visible ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                     {WIDGET_NAMES[widget.id] || widget.id}
                   </span>
                 </div>
