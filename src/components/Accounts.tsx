@@ -183,19 +183,44 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             newAutomation.keepAmount = parseFloat(automationForm.keepAmount || '0');
         }
 
-        const prevLastRunMonth = editingAutomationId ? data.automations?.find(a => a.id === editingAutomationId)?.lastRunMonth : undefined;
-        if (prevLastRunMonth !== undefined) {
-            newAutomation.lastRunMonth = prevLastRunMonth;
-        }
-
         const existingAutomations = data.automations || [];
         
         if (editingAutomationId) {
+            const prevLastRunMonth = existingAutomations.find(a => a.id === editingAutomationId)?.lastRunMonth;
+            if (prevLastRunMonth !== undefined) {
+                newAutomation.lastRunMonth = prevLastRunMonth;
+            }
             setData({
                 ...data,
                 automations: existingAutomations.map(a => a.id === editingAutomationId ? newAutomation as Automation : a)
             });
         } else {
+            // New automation logic: prevent immediate retroactive firing
+            const now = new Date();
+            const getMonthStr = (y: number, m: number) => {
+                let adjustedY = y;
+                let adjustedM = m;
+                if (adjustedM < 0) {
+                    adjustedM += 12;
+                    adjustedY -= 1;
+                }
+                return `${adjustedY}-${String(adjustedM + 1).padStart(2, '0')}`;
+            };
+            const currentMonthStr = getMonthStr(now.getFullYear(), now.getMonth());
+            const previousMonthStr = getMonthStr(now.getFullYear(), now.getMonth() - 1);
+
+            if (newAutomation.dayOfMonth === 0) {
+                newAutomation.lastRunMonth = previousMonthStr;
+            } else {
+                if (now.getDate() >= newAutomation.dayOfMonth) {
+                    // We are past the execution day for this month. 
+                    // Mark it as run for this month so it doesn't fire immediately.
+                    newAutomation.lastRunMonth = currentMonthStr;
+                } else {
+                    newAutomation.lastRunMonth = previousMonthStr;
+                }
+            }
+
             setData({
                 ...data,
                 automations: [...existingAutomations, newAutomation as Automation]
