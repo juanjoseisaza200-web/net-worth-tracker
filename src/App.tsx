@@ -17,7 +17,12 @@ import { fetchExchangeRates } from './utils/currency';
 
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
-  const [baseCurrency, setBaseCurrency] = useState<Currency>(data.baseCurrency);
+  const [viewCurrencies, setViewCurrencies] = useState<Record<string, Currency>>({
+    dashboard: data.baseCurrency,
+    expenses: data.baseCurrency,
+    investments: data.baseCurrency,
+    accounts: data.baseCurrency
+  });
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
@@ -61,7 +66,8 @@ function App() {
                   setData(cloudData);
                   // Sync cloud data to local storage so next boot is fresh
                   saveData(cloudData);
-                  setBaseCurrency(cloudData.baseCurrency);
+                  // Only update the view currencies to the new global default if they were the old global default,
+                  // or just let them stay as is for this session. 
                   setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
                   setLoading(false);
                 }
@@ -131,14 +137,25 @@ function App() {
   // Removed auto-save useEffect to prevent overwriting cloud data on initialization
   // useEffect(() => { ... }, [data, user]); 
 
-  useEffect(() => {
-    updateBaseCurrency(baseCurrency);
-  }, [baseCurrency]);
+  // Removed auto-save useEffect to prevent overwriting cloud data on initialization
+  // useEffect(() => { ... }, [data, user]); 
 
-  const handleCurrencyChange = (currency: Currency) => {
-    setBaseCurrency(currency);
+  const handleViewCurrencyChange = (view: string, currency: Currency) => {
+    setViewCurrencies(prev => ({ ...prev, [view]: currency }));
+  };
+
+  // Keep a global handler if Settings needs to change the default base currency
+  const handleGlobalCurrencyChange = (currency: Currency) => {
     const newData = { ...data, baseCurrency: currency };
+    setData(newData);
     handleCloudSave(newData);
+    // Also update all views to match the new global default
+    setViewCurrencies({
+      dashboard: currency,
+      expenses: currency,
+      investments: currency,
+      accounts: currency
+    });
   };
 
   const handleManualSync = async () => {
@@ -214,10 +231,10 @@ function App() {
 
         <main className="pb-24 max-w-md mx-auto relative">
           <Routes>
-            <Route path="/" element={<Dashboard data={data} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
-            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} user={user} />} />
-            <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={baseCurrency} onCurrencyChange={handleCurrencyChange} />} />
+            <Route path="/" element={<Dashboard data={data} baseCurrency={viewCurrencies.dashboard} onCurrencyChange={(c) => handleViewCurrencyChange('dashboard', c)} />} />
+            <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.expenses} onCurrencyChange={(c) => handleViewCurrencyChange('expenses', c)} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={viewCurrencies.investments} onCurrencyChange={(c) => handleViewCurrencyChange('investments', c)} user={user} />} />
+            <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.accounts} onCurrencyChange={(c) => handleViewCurrencyChange('accounts', c)} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>
         </main>
