@@ -15,6 +15,10 @@ interface DashboardProps {
 const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
 
 export default function Dashboard({ data, baseCurrency, onCurrencyChange }: DashboardProps) {
+  const [showAllExpenses, setShowAllExpenses] = useState(false);
+  const now = new Date();
+  const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
   const netWorth = calculateNetWorth(data, baseCurrency);
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
   const yearlyExpenses = calculateTotalExpenses(data, baseCurrency, 'year');
@@ -130,16 +134,28 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
 
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Expenses</h2>
-        {data.expenses.length === 0 ? (
-          <p className="text-gray-500 text-center py-4">No expenses recorded yet</p>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {showAllExpenses ? 'All Expenses' : 'Current Month Expenses'}
+          </h2>
+          {data.expenses.some(exp => !exp.date.startsWith(currentMonthStr)) && (
+            <button
+              onClick={() => setShowAllExpenses(!showAllExpenses)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1 rounded-full transition-colors"
+            >
+              {showAllExpenses ? 'Show Less' : 'Show All'}
+            </button>
+          )}
+        </div>
+        {data.expenses.filter(exp => showAllExpenses || exp.date.startsWith(currentMonthStr)).length === 0 ? (
+          <p className="text-gray-500 text-center py-4">No expenses recorded for this period</p>
         ) : (
           <div className="space-y-2">
             {data.expenses
+              .filter(exp => showAllExpenses || exp.date.startsWith(currentMonthStr))
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 5)
               .map(expense => (
-                <div key={expense.id} className="flex justify-between items-center py-2 border-b border-gray-100">
+                <div key={expense.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <div className="font-medium text-gray-800">{expense.description}</div>
                     <div className="text-sm text-gray-500">{expense.category}</div>
