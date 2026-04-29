@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { AppData, Currency } from '../types';
-import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome } from '../utils/calculations';
+import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
 
@@ -20,6 +20,7 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
   const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const netWorth = calculateNetWorth(data, baseCurrency);
+  const currencyExposure = calculateCurrencyExposure(data, baseCurrency);
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
   const yearlyExpenses = calculateTotalExpenses(data, baseCurrency, 'year');
   const monthlyIncome = calculateTotalIncome(data, baseCurrency, 'month');
@@ -51,6 +52,41 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
           {formatAdaptiveCurrency(netWorth, baseCurrency)}
         </div>
       </div>
+
+      {/* Currency Exposure */}
+      {currencyExposure.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">
+            Currency Exposure
+          </h2>
+          <div className="space-y-3">
+            {currencyExposure.map(exposure => (
+              <div key={exposure.currency}>
+                <div className="flex justify-between items-end mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-800">{exposure.currency}</span>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                      {exposure.percentage.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-gray-900">
+                      {formatCurrency(exposure.convertedValue, baseCurrency)}
+                    </div>
+                  </div>
+                </div>
+                {/* Visual bar */}
+                <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-blue-500 h-2 rounded-full" 
+                    style={{ width: `${exposure.percentage}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-4">

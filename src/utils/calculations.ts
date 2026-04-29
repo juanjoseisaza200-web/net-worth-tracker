@@ -43,6 +43,46 @@ export const calculateNetWorth = (data: AppData, targetCurrency: Currency): numb
   return total;
 };
 
+export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currency) => {
+  const exposureMap: Partial<Record<Currency, number>> = {};
+
+  const addExposure = (currency: Currency, nativeAmount: number) => {
+    if (!exposureMap[currency]) exposureMap[currency] = 0;
+    exposureMap[currency]! += nativeAmount;
+  };
+
+  if (data.accounts) {
+    data.accounts.forEach(acc => addExposure(acc.currency, acc.balance));
+  }
+  data.stocks.forEach(stock => addExposure(stock.currency, (stock.currentPrice || stock.purchasePrice) * stock.shares));
+  data.crypto.forEach(crypto => addExposure(crypto.currency, (crypto.currentPrice || crypto.purchasePrice) * crypto.amount));
+  data.fixedIncome.forEach(fixed => {
+    if (!fixed.linkedAccountId) {
+      addExposure(fixed.currency, fixed.amount);
+    }
+  });
+  data.variableInvestments.forEach(inv => addExposure(inv.currency, inv.currentValue || inv.amount));
+
+  const totalNetWorth = calculateNetWorth(data, targetCurrency);
+  if (totalNetWorth === 0) return [];
+
+  const exposureList = Object.keys(exposureMap).map(cur => {
+    const currency = cur as Currency;
+    const nativeValue = exposureMap[currency]!;
+    const convertedValue = convertCurrency(nativeValue, currency, targetCurrency);
+    const percentage = (convertedValue / totalNetWorth) * 100;
+    return {
+      currency,
+      nativeValue,
+      convertedValue,
+      percentage
+    };
+  });
+
+  return exposureList.sort((a, b) => b.percentage - a.percentage);
+};
+
+
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
   const currentYear = now.getFullYear();
