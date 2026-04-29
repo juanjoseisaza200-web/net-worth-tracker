@@ -121,9 +121,21 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             return { ...acc, balance: newBalance };
         });
 
+        const newActivityLog: ActivityLog = {
+            id: Date.now().toString(),
+            date: new Date().toISOString(),
+            description: `Manual Transfer: ${fromAccount?.name} to ${accounts.find(a => a.id === transferForm.toAccountId)?.name}`,
+            amount: amount,
+            currency: fromAccount?.currency || 'USD',
+            sourceAccountId: transferForm.fromAccountId,
+            destinationAccountId: transferForm.toAccountId,
+            type: 'manual'
+        };
+
         setData({
             ...data,
             accounts: newAccounts,
+            activityLogs: [...(data.activityLogs || []), newActivityLog]
         });
 
         setTransferForm({

@@ -132,7 +132,45 @@ export default function Dashboard({ data, baseCurrency, onCurrencyChange }: Dash
         </div>
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Transfers & Automations */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          Recent Transfers & Automations
+        </h2>
+        {(!data.activityLogs || data.activityLogs.length === 0) ? (
+          <p className="text-gray-500 text-center py-4">No recent transfers or automations</p>
+        ) : (
+          <div className="space-y-3">
+            {[...data.activityLogs]
+              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+              .slice(0, 10)
+              .map(log => (
+                <div key={log.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
+                  <div>
+                    <div className="font-medium text-gray-800 flex items-center gap-2">
+                      {log.type === 'automation' ? (
+                        <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">Auto</span>
+                      ) : (
+                        <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">Manual</span>
+                      )}
+                      {log.description}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-semibold text-blue-600 truncate max-w-[120px]">
+                      {formatCurrency(log.amount, log.currency)}
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {formatDateForDisplay(log.date.split('T')[0])}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
+      {/* Recent Expenses */}
       <div className="bg-white rounded-lg shadow p-4">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold text-gray-800">

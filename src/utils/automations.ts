@@ -1,4 +1,4 @@
-import { AppData, Account } from '../types';
+import { AppData, Account, ActivityLog } from '../types';
 import { convertCurrency } from './currency';
 
 export function processAutomations(data: AppData): { newData: AppData; messages: string[] } {
@@ -9,6 +9,7 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
   let newData = { ...data, accounts: [...(data.accounts || [])] };
   let messages: string[] = [];
   let updatedAutomations = [...data.automations];
+  let newActivityLogs: ActivityLog[] = [...(data.activityLogs || [])];
   let isModified = false;
 
   const now = new Date();
@@ -97,6 +98,18 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
           };
 
           messages.push(`Ran "${automation.name}": Transferred ${transferAmount} ${sourceAcc.currency} to ${destAcc.name}.`);
+          
+          newActivityLogs.push({
+            id: Date.now().toString() + Math.random().toString(36).substring(7),
+            date: now.toISOString(),
+            description: `Automated: ${automation.name}`,
+            amount: transferAmount,
+            currency: sourceAcc.currency,
+            sourceAccountId: sourceAcc.id,
+            destinationAccountId: destAcc.id,
+            type: 'automation'
+          });
+          
           isModified = true;
         }
 
@@ -109,6 +122,7 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
 
   if (isModified) {
     newData.automations = updatedAutomations;
+    newData.activityLogs = newActivityLogs;
     return { newData, messages };
   }
 

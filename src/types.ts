@@ -91,12 +91,24 @@ export interface Automation {
   lastRunMonth?: string; // Format: 'YYYY-MM'
 }
 
+export interface ActivityLog {
+  id: string;
+  date: string; // ISO format string
+  description: string;
+  amount: number;
+  currency: Currency;
+  sourceAccountId?: string;
+  destinationAccountId?: string;
+  type: 'automation' | 'manual';
+}
+
 export interface AppData {
   accounts: Account[];
   expenses: Expense[];
   incomes: Income[];
   recurringIncomes: RecurringIncome[];
   automations?: Automation[];
+  activityLogs?: ActivityLog[];
   stocks: Stock[];
   crypto: Crypto[];
   fixedIncome: FixedIncome[];
