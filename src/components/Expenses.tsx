@@ -817,43 +817,71 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               No expenses recorded yet. Add your first expense!
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {data.expenses
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map(expense => (
-                  <div key={expense.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0 mr-2">
-                        <div className="font-medium text-gray-800 truncate">{expense.description}</div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {expense.category} • {formatDateForDisplay(expense.date)}
+            <div className="flex flex-col">
+              {(() => {
+                const sortedExpenses = [...data.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                
+                const grouped: { monthYear: string; expenses: Expense[]; total: number }[] = [];
+                
+                sortedExpenses.forEach(expense => {
+                  const [year, month] = expense.date.split('-');
+                  const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+                  const monthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                  
+                  let group = grouped.find(g => g.monthYear === monthYear);
+                  if (!group) {
+                    group = { monthYear, expenses: [], total: 0 };
+                    grouped.push(group);
+                  }
+                  group.expenses.push(expense);
+                  group.total += convertCurrency(expense.amount, expense.currency, baseCurrency);
+                });
+
+                return grouped.map((group, index) => (
+                  <div key={group.monthYear}>
+                    <div className={`bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 flex justify-between ${index === 0 ? 'border-b border-gray-200' : 'border-y border-gray-200'}`}>
+                      <span>{group.monthYear}</span>
+                      <span>{formatCurrency(group.total, baseCurrency)}</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {group.expenses.map(expense => (
+                        <div key={expense.id} className="p-4 bg-white">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0 mr-2">
+                              <div className="font-medium text-gray-800 truncate">{expense.description}</div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                {expense.category} • {formatDateForDisplay(expense.date)}
+                              </div>
+                              <div className="text-sm text-gray-400 mt-1">
+                                {formatCurrency(expense.amount, expense.currency)}
+                                {expense.currency !== baseCurrency && (
+                                  <span className="ml-1">
+                                    ({formatCurrency(convertCurrency(expense.amount, expense.currency, baseCurrency), baseCurrency)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditExpense(expense)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              >
+                                <Edit2 size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteExpense(expense.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm text-gray-400 mt-1">
-                          {formatCurrency(expense.amount, expense.currency)}
-                          {expense.currency !== baseCurrency && (
-                            <span className="ml-1">
-                              ({formatCurrency(convertCurrency(expense.amount, expense.currency, baseCurrency), baseCurrency)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditExpense(expense)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteExpense(expense.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           )}
         </div>
@@ -869,43 +897,71 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               No income recorded yet. Add your first income!
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
-              {data.incomes
-                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                .map(income => (
-                  <div key={income.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1 min-w-0 mr-2">
-                        <div className="font-medium text-gray-800 truncate">{income.description}</div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {income.category} • {formatDateForDisplay(income.date)}
+            <div className="flex flex-col">
+              {(() => {
+                const sortedIncomes = [...data.incomes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                
+                const grouped: { monthYear: string; incomes: Income[]; total: number }[] = [];
+                
+                sortedIncomes.forEach(income => {
+                  const [year, month] = income.date.split('-');
+                  const dateObj = new Date(parseInt(year), parseInt(month) - 1);
+                  const monthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
+                  
+                  let group = grouped.find(g => g.monthYear === monthYear);
+                  if (!group) {
+                    group = { monthYear, incomes: [], total: 0 };
+                    grouped.push(group);
+                  }
+                  group.incomes.push(income);
+                  group.total += convertCurrency(income.amount, income.currency, baseCurrency);
+                });
+
+                return grouped.map((group, index) => (
+                  <div key={group.monthYear}>
+                    <div className={`bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 flex justify-between ${index === 0 ? 'border-b border-gray-200' : 'border-y border-gray-200'}`}>
+                      <span>{group.monthYear}</span>
+                      <span className="text-green-600">{formatCurrency(group.total, baseCurrency)}</span>
+                    </div>
+                    <div className="divide-y divide-gray-100">
+                      {group.incomes.map(income => (
+                        <div key={income.id} className="p-4 bg-white">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1 min-w-0 mr-2">
+                              <div className="font-medium text-gray-800 truncate">{income.description}</div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                {income.category} • {formatDateForDisplay(income.date)}
+                              </div>
+                              <div className="text-sm text-green-600 font-semibold mt-1">
+                                {formatCurrency(income.amount, income.currency)}
+                                {income.currency !== baseCurrency && (
+                                  <span className="ml-1 text-gray-400">
+                                    ({formatCurrency(convertCurrency(income.amount, income.currency, baseCurrency), baseCurrency)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleEditIncome(income)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                              >
+                                <Edit2 size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteIncome(income.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-sm text-green-600 font-semibold mt-1">
-                          {formatCurrency(income.amount, income.currency)}
-                          {income.currency !== baseCurrency && (
-                            <span className="ml-1 text-gray-400">
-                              ({formatCurrency(convertCurrency(income.amount, income.currency, baseCurrency), baseCurrency)})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditIncome(income)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteIncome(income.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+                ));
+              })()}
             </div>
           )}
         </div>
