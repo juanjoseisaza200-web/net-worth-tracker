@@ -100,7 +100,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
       case 'assetAllocation':
         if (assetAllocation.length === 0) return null;
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Asset Allocation</h2>
             <div className="w-full h-4 rounded-full flex overflow-hidden mb-4 bg-gray-100">
               {assetAllocation.map(asset => (
@@ -125,7 +125,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
       case 'currencyExposure':
         if (currencyExposure.length === 0) return null;
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Currency Exposure</h2>
             <div className="space-y-3">
               {currencyExposure.map(exposure => (
@@ -151,7 +151,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'quickStats':
         return (
-          <div key={id} className="grid grid-cols-2 gap-4 mb-4">
+          <div key={id} className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-gray-600">Monthly Income</span>
@@ -171,7 +171,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'netMonthly':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-600">Net Monthly</span>
               <DollarSign size={20} className={netMonthly >= 0 ? 'text-green-500' : 'text-red-500'} />
@@ -184,7 +184,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'cashAccounts':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Cash Accounts</h2>
             <div className="grid grid-cols-2 gap-4">
               {(data.accounts || []).slice(0, 4).map(acc => (
@@ -202,7 +202,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'investmentSummary':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Investment Summary</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-blue-50 rounded-lg p-3">
@@ -227,7 +227,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'activityLog':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Transfers & Automations</h2>
             {(!data.activityLogs || data.activityLogs.length === 0) ? (
               <p className="text-gray-500 text-center py-4">No recent transfers</p>
@@ -261,7 +261,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
       case 'recentExpenses':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4 mb-4">
+          <div key={id} className="bg-white rounded-lg shadow p-4">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-800">
                 {showAllExpenses ? 'All Expenses' : 'Recent Expenses'}
@@ -388,7 +388,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
           </div>
         </div>
       ) : (
-        <div className="space-y-0">
+        <div className="flex flex-col space-y-4">
           {layout.filter(w => w.visible).map(w => renderWidget(w.id))}
         </div>
       )}
