@@ -102,6 +102,12 @@ export interface ActivityLog {
   type: 'automation' | 'manual';
 }
 
+export interface DashboardWidgetConfig {
+  id: string;
+  visible: boolean;
+  order: number;
+}
+
 export interface AppData {
   accounts: Account[];
   expenses: Expense[];
@@ -116,6 +122,7 @@ export interface AppData {
   baseCurrency: Currency;
   settings?: {
     autoUpdatePrices: boolean;
+    dashboardLayout?: DashboardWidgetConfig[];
   };
 }
 
