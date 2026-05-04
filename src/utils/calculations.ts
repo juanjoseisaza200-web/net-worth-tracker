@@ -173,34 +173,6 @@ export const calculateTotalIncome = (data: AppData, targetCurrency: Currency, pe
     return sum + convertCurrency(income.amount, income.currency, targetCurrency);
   }, 0);
 
-  // Calculate recurring income for the period
-  if (period === 'month') {
-    // For monthly, count active recurring incomes ONLY if the pay date has occurred
-    const currentDay = now.getDate();
-    data.recurringIncomes.forEach(recurring => {
-      // Only count if active AND the pay day has passed or is today
-      // This makes "Net Monthly" reflect actual cash flow so far
-      if (recurring.isActive && recurring.dayOfMonth <= currentDay) {
-        total += convertCurrency(recurring.amount, recurring.currency, targetCurrency);
-      }
-    });
-  } else if (period === 'year') {
-    // For yearly, count active recurring incomes 12 times
-    data.recurringIncomes.forEach(recurring => {
-      if (recurring.isActive) {
-        total += convertCurrency(recurring.amount, recurring.currency, targetCurrency) * 12;
-      }
-    });
-  } else {
-    // For all time, calculate based on when recurring income started
-    // For simplicity, we'll just count active ones once
-    data.recurringIncomes.forEach(recurring => {
-      if (recurring.isActive) {
-        total += convertCurrency(recurring.amount, recurring.currency, targetCurrency);
-      }
-    });
-  }
-
   return total;
 };
 

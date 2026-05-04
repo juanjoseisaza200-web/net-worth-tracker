@@ -1,14 +1,22 @@
-import { AppData, Account, ActivityLog } from '../types';
+import { AppData, Account, ActivityLog, Income } from '../types';
 import { convertCurrency } from './currency';
 
 export function processAutomations(data: AppData): { newData: AppData; messages: string[] } {
-  if (!data.automations || data.automations.length === 0) {
+  const hasAutomations = data.automations && data.automations.length > 0;
+  const hasRecurringIncomes = data.recurringIncomes && data.recurringIncomes.length > 0;
+
+  if (!hasAutomations && !hasRecurringIncomes) {
     return { newData: data, messages: [] };
   }
 
-  let newData = { ...data, accounts: [...(data.accounts || [])] };
+  let newData = { 
+    ...data, 
+    accounts: [...(data.accounts || [])],
+    incomes: [...(data.incomes || [])]
+  };
   let messages: string[] = [];
-  let updatedAutomations = [...data.automations];
+  let updatedAutomations = data.automations ? [...data.automations] : [];
+  let updatedRecurringIncomes = data.recurringIncomes ? [...data.recurringIncomes] : [];
   let newActivityLogs: ActivityLog[] = [...(data.activityLogs || [])];
   let isModified = false;
 
@@ -120,8 +128,72 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
     }
   }
 
+  // --- Process Recurring Incomes ---
+  for (let i = 0; i < updatedRecurringIncomes.length; i++) {
+    const recurring = updatedRecurringIncomes[i];
+    if (!recurring.isActive || !recurring.accountId) continue;
+
+    let runForMonth = '';
+    let shouldRun = false;
+
+    if (date >= recurring.dayOfMonth) {
+      if (recurring.lastRunMonth !== currentMonthStr && (!recurring.lastRunMonth || recurring.lastRunMonth < currentMonthStr)) {
+        shouldRun = true;
+        runForMonth = currentMonthStr;
+      }
+    } else {
+      if (!recurring.lastRunMonth || recurring.lastRunMonth < previousMonthStr) {
+        shouldRun = true;
+        runForMonth = previousMonthStr;
+      }
+    }
+
+    if (shouldRun) {
+      const targetAccIndex = newData.accounts.findIndex(a => a.id === recurring.accountId);
+      
+      if (targetAccIndex !== -1) {
+        const targetAcc = newData.accounts[targetAccIndex];
+        
+        // Add money to the account (handling currency conversion if the account is in a different currency)
+        const convertedAmount = convertCurrency(recurring.amount, recurring.currency, targetAcc.currency);
+        newData.accounts[targetAccIndex] = {
+          ...targetAcc,
+          balance: targetAcc.balance + convertedAmount
+        };
+
+        // Create a physical income record for the historical logs
+        const newIncome: Income = {
+          id: Date.now().toString() + Math.random().toString(36).substring(7),
+          amount: recurring.amount,
+          currency: recurring.currency,
+          description: recurring.description,
+          category: recurring.category,
+          date: now.toISOString().split('T')[0], // YYYY-MM-DD
+          accountId: targetAcc.id
+        };
+        newData.incomes.push(newIncome);
+
+        messages.push(`Received Salary/Income: ${recurring.amount} ${recurring.currency} deposited to ${targetAcc.name}.`);
+        
+        newActivityLogs.push({
+          id: Date.now().toString() + Math.random().toString(36).substring(7),
+          date: now.toISOString(),
+          description: `Automated Income: ${recurring.description}`,
+          amount: recurring.amount,
+          currency: recurring.currency,
+          destinationAccountId: targetAcc.id,
+          type: 'automation'
+        });
+
+        updatedRecurringIncomes[i] = { ...recurring, lastRunMonth: runForMonth };
+        isModified = true;
+      }
+    }
+  }
+
   if (isModified) {
     newData.automations = updatedAutomations;
+    newData.recurringIncomes = updatedRecurringIncomes;
     newData.activityLogs = newActivityLogs;
     return { newData, messages };
   }

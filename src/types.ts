@@ -39,6 +39,7 @@ export interface RecurringIncome {
   dayOfMonth: number; // 1-31, the day of the month when income is received
   isActive: boolean;
   accountId?: string;
+  lastRunMonth?: string; // YYYY-MM format to track when it was last processed
 }
 
 export interface Stock {
