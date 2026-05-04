@@ -108,6 +108,16 @@ export interface DashboardWidgetConfig {
   order: number;
 }
 
+export interface Debt {
+  id: string;
+  type: 'payable' | 'receivable'; // payable = I owe them; receivable = They owe me
+  personName: string;
+  amount: number;
+  currency: Currency;
+  description: string;
+  dueDate?: string;
+}
+
 export interface AppData {
   accounts: Account[];
   expenses: Expense[];
@@ -119,6 +129,7 @@ export interface AppData {
   crypto: Crypto[];
   fixedIncome: FixedIncome[];
   variableInvestments: VariableInvestment[];
+  debts?: Debt[];
   baseCurrency: Currency;
   settings?: {
     autoUpdatePrices: boolean;

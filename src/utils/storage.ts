@@ -22,6 +22,7 @@ const migrateData = (data: any): AppData => {
   if (!data.incomes) data.incomes = [];
   if (!data.recurringIncomes) data.recurringIncomes = [];
   if (!data.expenses) data.expenses = [];
+  if (!data.debts) data.debts = [];
 
   if (!data.accounts) {
     const defaultAccountId = 'default-checking-' + Date.now();
