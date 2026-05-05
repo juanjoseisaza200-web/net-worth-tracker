@@ -53,7 +53,10 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
           runForMonth = currentMonthStr;
         }
       } else {
-        if (!automation.lastRunMonth || automation.lastRunMonth < previousMonthStr) {
+        if (!automation.lastRunMonth) {
+          updatedAutomations[i] = { ...automation, lastRunMonth: previousMonthStr };
+          isModified = true;
+        } else if (automation.lastRunMonth < previousMonthStr) {
           shouldRun = true;
           runForMonth = previousMonthStr;
         }
@@ -65,7 +68,10 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
           runForMonth = currentMonthStr;
         }
       } else {
-        if (!automation.lastRunMonth || automation.lastRunMonth < previousMonthStr) {
+        if (!automation.lastRunMonth) {
+          updatedAutomations[i] = { ...automation, lastRunMonth: previousMonthStr };
+          isModified = true;
+        } else if (automation.lastRunMonth < previousMonthStr) {
           shouldRun = true;
           runForMonth = previousMonthStr;
         }
@@ -142,7 +148,10 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
         runForMonth = currentMonthStr;
       }
     } else {
-      if (!recurring.lastRunMonth || recurring.lastRunMonth < previousMonthStr) {
+      if (!recurring.lastRunMonth) {
+        updatedRecurringIncomes[i] = { ...recurring, lastRunMonth: previousMonthStr };
+        isModified = true;
+      } else if (recurring.lastRunMonth < previousMonthStr) {
         shouldRun = true;
         runForMonth = previousMonthStr;
       }
