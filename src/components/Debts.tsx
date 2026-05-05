@@ -65,7 +65,7 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
       amount: parseFloat(amount) || 0,
       currency,
       description,
-      dueDate: dueDate || undefined
+      dueDate
     };
 
     let newDebts;
