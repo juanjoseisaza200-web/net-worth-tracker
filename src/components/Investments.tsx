@@ -454,16 +454,25 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
   };
 
-  // Auto-refresh prices every 60 seconds
+  // Keep a ref to the latest refreshPrices so the interval always calls the
+  // current version (with fresh data) without re-creating the interval whenever
+  // prices change. The old effect depended on data.stocks/data.crypto, which it
+  // then mutated via saveLocalData — that tore down and re-armed the interval on
+  // every price update and fired an extra immediate fetch each time.
+  const refreshPricesRef = useRef(refreshPrices);
+  refreshPricesRef.current = refreshPrices;
+
+  const autoUpdatePrices = data.settings?.autoUpdatePrices ?? true;
+
+  // Auto-refresh prices every 60 seconds. Re-armed only when the auto-update
+  // toggle changes — not when prices refresh.
   useEffect(() => {
     let isCurrent = true;
 
     const autoRefresh = async () => {
       if (document.hidden) return;
-      const autoUpdate = data.settings?.autoUpdatePrices ?? true;
-      if (!autoUpdate) return;
-
-      if (isCurrent) await refreshPrices(false);
+      if (!autoUpdatePrices) return;
+      if (isCurrent) await refreshPricesRef.current(false);
     };
 
     // Initial fetch
@@ -475,8 +484,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       isCurrent = false;
       clearInterval(intervalId);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.stocks, data.crypto, data.settings?.autoUpdatePrices]);
+  }, [autoUpdatePrices]);
 
   // Touch Handlers for Pull-to-Refresh
   const handleTouchStart = (e: React.TouchEvent) => {

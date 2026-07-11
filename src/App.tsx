@@ -1,20 +1,22 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, TrendingUp, DollarSign, Building2, Users } from 'lucide-react';
-import Dashboard from './components/Dashboard';
-import Accounts from './components/Accounts';
-import Expenses from './components/Expenses';
-import Investments from './components/Investments';
-import Debts from './components/Debts';
 import { AppData, Currency } from './types';
 import { loadData, saveData, subscribeToData, saveDataToCloud } from './utils/storage';
 import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
-import Settings from './components/Settings';
 import Header from './components/Header';
-
 import { fetchExchangeRates } from './utils/currency';
+
+// Route screens are code-split so the initial bundle stays small; each loads on
+// first navigation to that tab.
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Accounts = lazy(() => import('./components/Accounts'));
+const Expenses = lazy(() => import('./components/Expenses'));
+const Investments = lazy(() => import('./components/Investments'));
+const Debts = lazy(() => import('./components/Debts'));
+const Settings = lazy(() => import('./components/Settings'));
 
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
@@ -243,6 +245,11 @@ function App() {
         </div>
 
         <main className="pb-24 max-w-md mx-auto relative">
+          <Suspense fallback={
+            <div className="flex justify-center items-center py-20">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          }>
           <Routes>
             <Route path="/" element={<Dashboard data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.dashboard} onCurrencyChange={(c) => handleViewCurrencyChange('dashboard', c)} />} />
             <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.expenses} onCurrencyChange={(c) => handleViewCurrencyChange('expenses', c)} />} />
@@ -251,6 +258,7 @@ function App() {
             <Route path="/debts" element={<Debts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.debts} onCurrencyChange={(c) => handleViewCurrencyChange('debts', c)} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>
+          </Suspense>
         </main>
         <Navigation />
       </div>

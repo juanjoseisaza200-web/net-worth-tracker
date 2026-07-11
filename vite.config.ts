@@ -31,6 +31,17 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true
-  }
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split heavy vendors into their own chunks so the main bundle is small
+        // and these can be cached independently across deploys.
+        manualChunks: {
+          firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+        },
+      },
+    },
+  },
 })
 
