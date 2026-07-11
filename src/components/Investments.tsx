@@ -249,6 +249,10 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     const interestRate = parseAmount(fixedForm.interestRate) ?? 0;
 
+    // Reset the daily-interest clock to today: the amount entered is the value as of now.
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     if (editingItem && editingItem.type === 'fixed') {
       const updatedList = data.fixedIncome.map(f => {
         if (f.id === editingItem.id) {
@@ -258,6 +262,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             amount: amount,
             interestRate,
             currency: fixedForm.currency,
+            lastAccruedDate: todayKey,
           };
           if (fixedForm.maturityDate) {
             updated.maturityDate = fixedForm.maturityDate;
@@ -281,6 +286,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         amount: amount,
         interestRate,
         currency: fixedForm.currency,
+        lastAccruedDate: todayKey,
       };
       if (fixedForm.maturityDate) {
         newFixed.maturityDate = fixedForm.maturityDate;
@@ -1507,8 +1513,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                               <div className="font-semibold text-lg text-gray-800 truncate flex items-center gap-2">
                                 {name} {isLinked && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-normal">Linked to Cash Acct</span>}
                               </div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                Interest Rate: {fixed.interestRate}%
+                              <div className="text-sm text-gray-500 mt-1 flex items-center gap-1 flex-wrap">
+                                <span>Interest Rate: {fixed.interestRate}% EA</span>
+                                {!isLinked && fixed.interestRate > 0 && (
+                                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">grows daily</span>
+                                )}
                               </div>
                               {fixed.maturityDate && (
                                 <div className="text-sm text-gray-500">

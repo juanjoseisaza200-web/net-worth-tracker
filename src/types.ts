@@ -64,10 +64,11 @@ export interface FixedIncome {
   id: string;
   name: string;
   amount: number;
-  interestRate: number;
+  interestRate: number; // effective annual rate (%), e.g. 9.3
   maturityDate?: string;
   currency: Currency;
   linkedAccountId?: string;
+  lastAccruedDate?: string; // YYYY-MM-DD: last day daily interest was accrued into `amount`
 }
 
 export interface VariableInvestment {

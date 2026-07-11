@@ -9,6 +9,7 @@ import Login from './components/Login';
 import Header from './components/Header';
 import { fetchExchangeRates } from './utils/currency';
 import { recordNetWorthSnapshot } from './utils/calculations';
+import { accrueFixedIncome } from './utils/fixedIncome';
 
 // Route screens are code-split so the initial bundle stays small; each loads on
 // first navigation to that tab.
@@ -74,24 +75,30 @@ function App() {
             dataUnsubRef.current = subscribeToData(currentUser.uid, async (cloudData) => {
               if (mounted) {
                 console.log("Cloud data updated", cloudData);
-                const { newData, messages } = (await import('./utils/automations')).processAutomations(cloudData);
+                // Side effects of loading data: accrue daily fixed-income interest,
+                // then run scheduled automations / recurring incomes. Both return the
+                // same reference when nothing changes, so `newData !== cloudData`
+                // tells us whether we need to persist an update.
+                const accrued = accrueFixedIncome(cloudData);
+                const { newData, messages } = (await import('./utils/automations')).processAutomations(accrued);
+                const changed = newData !== cloudData;
 
-                if (messages.length > 0) {
+                if (changed) {
                   try {
                     await saveDataToCloud(currentUser.uid, newData);
-                    alert("Automations Ran automatically:\n" + messages.join("\n"));
+                    if (messages.length > 0) {
+                      alert("Automations Ran automatically:\n" + messages.join("\n"));
+                    }
                   } catch (e) {
-                    console.error("Failed to save automations", e);
+                    console.error("Failed to save data updates", e);
                   }
-                } else {
-                  setData(cloudData);
-                  // Sync cloud data to local storage so next boot is fresh
-                  saveData(cloudData);
-                  // Only update the view currencies to the new global default if they were the old global default,
-                  // or just let them stay as is for this session.
-                  setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
-                  setLoading(false);
                 }
+
+                // Always reflect the latest data locally and finish loading.
+                setData(newData);
+                saveData(newData); // keep localStorage fresh for next boot
+                setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
+                setLoading(false);
               }
             });
           } else {
