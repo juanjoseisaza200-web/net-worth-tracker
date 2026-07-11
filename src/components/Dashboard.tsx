@@ -111,22 +111,30 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
   const renderWidget = (id: string) => {
     switch(id) {
       case 'netWorthHistory':
-        if (netWorthHistoryData.length < 2) return null;
         return (
           <div key={id} className="bg-white rounded-lg shadow p-4">
             <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Net Worth Trend</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
-                <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
-                <Tooltip
-                  formatter={(v) => formatCurrency(Number(v), baseCurrency)}
-                  labelFormatter={(d) => formatDateForDisplay(d as string)}
-                />
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            {netWorthHistoryData.length < 2 ? (
+              <div className="text-center text-gray-400 text-sm py-8 px-2">
+                <TrendingUp size={28} className="mx-auto mb-2 text-gray-300" />
+                {netWorthHistoryData.length === 0
+                  ? 'Your net worth trend will build up here. A point is saved each day you make a change — check back after a couple of days.'
+                  : 'Tracking started today. Once there are at least two days of history, your trend line will appear here.'}
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
+                  <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
+                  <Tooltip
+                    formatter={(v) => formatCurrency(Number(v), baseCurrency)}
+                    labelFormatter={(d) => formatDateForDisplay(d as string)}
+                  />
+                  <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         );
 
