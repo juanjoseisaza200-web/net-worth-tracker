@@ -18,11 +18,34 @@ const defaultData: AppData = {
   },
 };
 
+const SUPPORTED_CURRENCIES: Currency[] = ['USD', 'COP'];
+
+// Coerce any currency that's no longer supported (e.g. legacy EUR/GBP/JPY data
+// from before currencies were restricted) to USD. Without this, convertCurrency
+// looks up an undefined rate and returns NaN, poisoning every total in the app.
+const sanitizeCurrency = (value: any): Currency =>
+  SUPPORTED_CURRENCIES.includes(value) ? value : 'USD';
+
 const migrateData = (data: any): AppData => {
   if (!data.incomes) data.incomes = [];
   if (!data.recurringIncomes) data.recurringIncomes = [];
   if (!data.expenses) data.expenses = [];
   if (!data.debts) data.debts = [];
+
+  // Sanitize currencies before anything reads them (baseCurrency is used to
+  // build the default account below, and convertCurrency runs on every record).
+  data.baseCurrency = sanitizeCurrency(data.baseCurrency);
+  const currencyBearingArrays = [
+    'accounts', 'expenses', 'incomes', 'recurringIncomes', 'stocks',
+    'crypto', 'fixedIncome', 'variableInvestments', 'debts', 'activityLogs',
+  ];
+  currencyBearingArrays.forEach(key => {
+    if (Array.isArray(data[key])) {
+      data[key].forEach((item: any) => {
+        if (item && 'currency' in item) item.currency = sanitizeCurrency(item.currency);
+      });
+    }
+  });
 
   if (!data.accounts) {
     const defaultAccountId = 'default-checking-' + Date.now();

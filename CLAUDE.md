@@ -32,9 +32,9 @@ Real-time sync is push-based: `subscribeToData` (Firestore `onSnapshot`) fires o
 
 ### Currency handling
 
-Every monetary value carries its own `Currency` (`USD | COP | EUR | GBP | JPY | CAD | AUD`). `utils/currency.ts` converts everything through USD as a pivot. Hardcoded approximate rates are the default; `fetchExchangeRates()` overwrites them with live rates from `open.er-api.com` once on app boot (not persisted — refetched every load).
+Every monetary value carries its own `Currency` (`USD | COP`). `utils/currency.ts` converts everything through USD as a pivot. Hardcoded approximate rates are the default; `fetchExchangeRates()` overwrites them with live rates from `open.er-api.com` once on app boot (not persisted — refetched every load). `migrateData` (`utils/storage.ts`) coerces any legacy/unsupported currency code on stored records to `USD`, since `convertCurrency` returns `NaN` for a currency missing from the rate table.
 
-Separately, `App.tsx` keeps a `viewCurrencies` map (one entry per tab) distinct from the persisted `data.baseCurrency`. This lets a user view, say, Expenses in EUR while the stored global default and Dashboard stay in USD — don't conflate "the view currency for this screen" with "the base currency setting."
+Separately, `App.tsx` keeps a `viewCurrencies` map (one entry per tab) distinct from the persisted `data.baseCurrency`. This lets a user view, say, Expenses in COP while the stored global default and Dashboard stay in USD — don't conflate "the view currency for this screen" with "the base currency setting."
 
 ### External price/search data
 
