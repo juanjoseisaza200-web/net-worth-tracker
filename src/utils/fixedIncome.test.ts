@@ -43,11 +43,25 @@ describe('accrueFixedIncome', () => {
     expect(accrueFixedIncome(data)).toBe(data);
   });
 
-  it('skips linked entries and zero-rate entries', () => {
-    const data = withFixed([
-      fi({ id: 'a', linkedAccountId: 'acc1', amount: 5000, lastAccruedDate: '2025-01-01' }),
-      fi({ id: 'b', interestRate: 0, amount: 5000, lastAccruedDate: '2025-01-01' }),
-    ]);
+  it('grows the linked cash account balance for a linked entry', () => {
+    // 2025-03-10 -> 2026-03-10 = 365 days, 10% EA => account balance *1.10
+    const data: AppData = {
+      ...withFixed([fi({ linkedAccountId: 'acc1', amount: 0, interestRate: 10, lastAccruedDate: '2025-03-10' })]),
+      accounts: [{ id: 'acc1', name: 'Nu', balance: 1000, currency: 'USD', type: 'savings' }],
+    };
+    const out = accrueFixedIncome(data);
+    expect(out.accounts[0].balance).toBeCloseTo(1100, 4);
+    expect(out.fixedIncome[0].amount).toBe(0); // entry amount stays 0
+    expect(out.fixedIncome[0].lastAccruedDate).toBe('2026-03-10');
+  });
+
+  it('leaves an orphaned linked entry (missing account) untouched', () => {
+    const data = withFixed([fi({ linkedAccountId: 'missing', amount: 0, lastAccruedDate: '2025-01-01' })]);
+    expect(accrueFixedIncome(data)).toBe(data);
+  });
+
+  it('skips zero-rate entries', () => {
+    const data = withFixed([fi({ interestRate: 0, amount: 5000, lastAccruedDate: '2025-01-01' })]);
     expect(accrueFixedIncome(data)).toBe(data);
   });
 

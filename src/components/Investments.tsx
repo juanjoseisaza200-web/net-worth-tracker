@@ -1515,7 +1515,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                               </div>
                               <div className="text-sm text-gray-500 mt-1 flex items-center gap-1 flex-wrap">
                                 <span>Interest Rate: {fixed.interestRate}% EA</span>
-                                {!isLinked && fixed.interestRate > 0 && (
+                                {fixed.interestRate > 0 && (
                                   <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">grows daily</span>
                                 )}
                               </div>
