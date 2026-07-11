@@ -1,4 +1,4 @@
-import { AppData, Account, ActivityLog, Income } from '../types';
+import { AppData, ActivityLog, Income } from '../types';
 import { convertCurrency } from './currency';
 
 export function processAutomations(data: AppData): { newData: AppData; messages: string[] } {
@@ -9,15 +9,15 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
     return { newData: data, messages: [] };
   }
 
-  let newData = { 
-    ...data, 
+  const newData = {
+    ...data,
     accounts: [...(data.accounts || [])],
     incomes: [...(data.incomes || [])]
   };
-  let messages: string[] = [];
-  let updatedAutomations = data.automations ? [...data.automations] : [];
-  let updatedRecurringIncomes = data.recurringIncomes ? [...data.recurringIncomes] : [];
-  let newActivityLogs: ActivityLog[] = [...(data.activityLogs || [])];
+  const messages: string[] = [];
+  const updatedAutomations = data.automations ? [...data.automations] : [];
+  const updatedRecurringIncomes = data.recurringIncomes ? [...data.recurringIncomes] : [];
+  const newActivityLogs: ActivityLog[] = [...(data.activityLogs || [])];
   let isModified = false;
 
   const now = new Date();

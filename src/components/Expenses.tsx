@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, DollarSign } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome } from '../utils/calculations';
 import { formatDateForDisplay } from '../utils/date';
 import { parseAmount } from '../utils/number';
+import CurrencySelect from './CurrencySelect';
 
 interface ExpensesProps {
   data: AppData;
@@ -13,7 +14,6 @@ interface ExpensesProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP'];
 const expenseCategories = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
 const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';
@@ -435,15 +435,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select
+                <CurrencySelect
                   value={expenseForm.currency}
-                  onChange={(e) => setExpenseForm({ ...expenseForm, currency: e.target.value as Currency })}
+                  onChange={(c) => setExpenseForm({ ...expenseForm, currency: c })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {currencies.map(currency => (
-                    <option key={currency} value={currency}>{currency}</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -536,15 +532,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select
+                <CurrencySelect
                   value={incomeForm.currency}
-                  onChange={(e) => setIncomeForm({ ...incomeForm, currency: e.target.value as Currency })}
+                  onChange={(c) => setIncomeForm({ ...incomeForm, currency: c })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  {currencies.map(currency => (
-                    <option key={currency} value={currency}>{currency}</option>
-                  ))}
-                </select>
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -631,15 +623,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <select
+              <CurrencySelect
                 value={recurringForm.currency}
-                onChange={(e) => setRecurringForm({ ...recurringForm, currency: e.target.value as Currency })}
+                onChange={(c) => setRecurringForm({ ...recurringForm, currency: c })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                {currencies.map(currency => (
-                  <option key={currency} value={currency}>{currency}</option>
-                ))}
-              </select>
+              />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -750,15 +738,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-lg font-semibold text-gray-800">Income Overview</h2>
-            <select
+            <CurrencySelect
               value={baseCurrency}
-              onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+              onChange={onCurrencyChange}
               className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
-            >
-              {currencies.map(currency => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
+            />
           </div>
           <div className="flex justify-between items-center">
             <div>

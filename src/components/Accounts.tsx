@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2, PlayCircle } from 'lucide-react';
+import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2 } from 'lucide-react';
 import { AppData, Account, AccountType, Currency, Automation, ActivityLog } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { parseAmount } from '../utils/number';
+import CurrencySelect from './CurrencySelect';
 
 interface AccountsProps {
     data: AppData;
@@ -11,7 +12,6 @@ interface AccountsProps {
     onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP'];
 const accountTypes: { value: AccountType; label: string }[] = [
     { value: 'checking', label: 'Checking' },
     { value: 'savings', label: 'Savings' },
@@ -313,15 +313,11 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                   <>
                     <div className="flex items-center justify-between mb-4">
                         <h1 className="text-2xl font-bold text-gray-800">Accounts</h1>
-                        <select
+                        <CurrencySelect
                             value={baseCurrency}
-                            onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+                            onChange={onCurrencyChange}
                             className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
-                        >
-                            {currencies.map(currency => (
-                                <option key={currency} value={currency}>{currency}</option>
-                            ))}
-                        </select>
+                        />
                     </div>
                     <div className="text-sm text-gray-600 mb-1">Total Liquid Cash</div>
                     <div className="text-4xl font-bold text-blue-600">
@@ -582,15 +578,11 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                                <select
+                                <CurrencySelect
                                     value={addForm.currency}
-                                    onChange={(e) => setAddForm({ ...addForm, currency: e.target.value as Currency })}
+                                    onChange={(c) => setAddForm({ ...addForm, currency: c })}
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    {currencies.map(currency => (
-                                        <option key={currency} value={currency}>{currency}</option>
-                                    ))}
-                                </select>
+                                />
                             </div>
                         </div>
                         <div>

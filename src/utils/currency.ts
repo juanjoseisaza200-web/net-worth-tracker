@@ -1,5 +1,15 @@
 import { Currency } from '../types';
 
+// The only currencies the app supports. Central source of truth used by the
+// currency picker (CurrencySelect) and by migrateData to sanitize stored data.
+export const SUPPORTED_CURRENCIES: Currency[] = ['USD', 'COP'];
+
+// Coerce any currency that's no longer supported (e.g. legacy EUR/GBP/JPY data)
+// to USD. Without this, convertCurrency looks up an undefined rate and returns
+// NaN, poisoning every total in the app.
+export const sanitizeCurrency = (value: any): Currency =>
+  SUPPORTED_CURRENCIES.includes(value) ? value : 'USD';
+
 // Exchange rates cache (in a real app, you'd fetch these from an API)
 const exchangeRates: Record<Currency, number> = {
   USD: 1,

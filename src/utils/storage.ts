@@ -1,5 +1,6 @@
 import { AppData, Currency, Account } from '../types';
 import { calculateTotalExpenses, calculateTotalIncome } from './calculations';
+import { sanitizeCurrency } from './currency';
 
 const STORAGE_KEY = 'net-worth-tracker-data';
 
@@ -17,14 +18,6 @@ const defaultData: AppData = {
     autoUpdatePrices: true,
   },
 };
-
-const SUPPORTED_CURRENCIES: Currency[] = ['USD', 'COP'];
-
-// Coerce any currency that's no longer supported (e.g. legacy EUR/GBP/JPY data
-// from before currencies were restricted) to USD. Without this, convertCurrency
-// looks up an undefined rate and returns NaN, poisoning every total in the app.
-const sanitizeCurrency = (value: any): Currency =>
-  SUPPORTED_CURRENCIES.includes(value) ? value : 'USD';
 
 const migrateData = (data: any): AppData => {
   if (!data.incomes) data.incomes = [];

@@ -1,9 +1,10 @@
-import React, { useState, DragEvent } from 'react';
+import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { AppData, Currency, DashboardWidgetConfig } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
+import CurrencySelect from './CurrencySelect';
 
 interface DashboardProps {
   data: AppData;
@@ -11,8 +12,6 @@ interface DashboardProps {
   baseCurrency: Currency;
   onCurrencyChange: (currency: Currency) => void;
 }
-
-const currencies: Currency[] = ['USD', 'COP'];
 
 const DEFAULT_LAYOUT: DashboardWidgetConfig[] = [
   { id: 'assetAllocation', visible: true, order: 0 },
@@ -53,9 +52,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
   const currencyExposure = calculateCurrencyExposure(data, baseCurrency);
   const assetAllocation = calculateAssetAllocation(data, baseCurrency);
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
-  const yearlyExpenses = calculateTotalExpenses(data, baseCurrency, 'year');
   const monthlyIncome = calculateTotalIncome(data, baseCurrency, 'month');
-  const yearlyIncome = calculateTotalIncome(data, baseCurrency, 'year');
   const netMonthly = monthlyIncome - monthlyExpenses;
 
   const totalStocks = data.stocks.length;
@@ -329,15 +326,11 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
               </button>
             )}
             
-            <select
+            <CurrencySelect
               value={baseCurrency}
-              onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+              onChange={onCurrencyChange}
               className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              {currencies.map(currency => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
         <div className="text-4xl font-bold text-blue-600">

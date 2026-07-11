@@ -7,7 +7,7 @@ import Expenses from './components/Expenses';
 import Investments from './components/Investments';
 import Debts from './components/Debts';
 import { AppData, Currency } from './types';
-import { loadData, saveData, updateBaseCurrency, subscribeToData, saveDataToCloud } from './utils/storage';
+import { loadData, saveData, subscribeToData, saveDataToCloud } from './utils/storage';
 import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
@@ -32,7 +32,9 @@ function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
-  const [ratesLoaded, setRatesLoaded] = useState(false);
+  // Value is unused; the setter is called only to force a re-render once live
+  // exchange rates land (they mutate a module-level table, not React state).
+  const [, setRatesLoaded] = useState(false);
   // Holds the active Firestore snapshot unsubscribe so it can be torn down
   // before re-subscribing or on unmount (prevents stacked listeners).
   const dataUnsubRef = useRef<(() => void) | null>(null);
@@ -162,20 +164,6 @@ function App() {
     setViewCurrencies(prev => ({ ...prev, [view]: currency }));
   };
 
-  // Keep a global handler if Settings needs to change the default base currency
-  const handleGlobalCurrencyChange = (currency: Currency) => {
-    const newData = { ...data, baseCurrency: currency };
-    setData(newData);
-    handleCloudSave(newData);
-    // Also update all views to match the new global default
-    setViewCurrencies({
-      dashboard: currency,
-      expenses: currency,
-      investments: currency,
-      accounts: currency
-    });
-  };
-
   const handleManualSync = async () => {
     if (user) {
       try {
@@ -241,8 +229,15 @@ function App() {
             </div>
           )}
           {saveError && (
-            <div className="bg-red-100 text-red-800 text-xs px-3 py-1 rounded-full shadow border border-red-200 flex items-center gap-1">
-              ⚠️ {saveError}
+            <div className="pointer-events-auto bg-red-100 text-red-800 text-xs px-3 py-1.5 rounded-full shadow border border-red-200 flex items-center gap-2">
+              <span>⚠️ {saveError}</span>
+              <button
+                onClick={handleManualSync}
+                disabled={isSaving}
+                className="font-semibold underline hover:text-red-900 disabled:opacity-50"
+              >
+                Retry
+              </button>
             </div>
           )}
         </div>
@@ -251,7 +246,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.dashboard} onCurrencyChange={(c) => handleViewCurrencyChange('dashboard', c)} />} />
             <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.expenses} onCurrencyChange={(c) => handleViewCurrencyChange('expenses', c)} />} />
-            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={viewCurrencies.investments} onCurrencyChange={(c) => handleViewCurrencyChange('investments', c)} user={user} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={viewCurrencies.investments} onCurrencyChange={(c) => handleViewCurrencyChange('investments', c)} />} />
             <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.accounts} onCurrencyChange={(c) => handleViewCurrencyChange('accounts', c)} />} />
             <Route path="/debts" element={<Debts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.debts} onCurrencyChange={(c) => handleViewCurrencyChange('debts', c)} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />

@@ -38,7 +38,10 @@ export default function AutocompleteInput({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Debounced search function
+  // Debounced search function.
+  // debounce() wraps the callback, so eslint can't statically see its deps;
+  // memoizing on fetchSuggestions + minChars is the intended behavior.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
     debounce(async (query: string) => {
       if (query.length < minChars) {

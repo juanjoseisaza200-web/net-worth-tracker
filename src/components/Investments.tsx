@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { User } from 'firebase/auth';
 import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, Building2 } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
@@ -9,6 +8,7 @@ import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
+import CurrencySelect from './CurrencySelect';
 
 interface InvestmentsProps {
   data: AppData;
@@ -16,13 +16,11 @@ interface InvestmentsProps {
   saveLocalData: (data: AppData) => void;
   baseCurrency: Currency;
   onCurrencyChange: (currency: Currency) => void;
-  user: User | null;
 }
 
-const currencies: Currency[] = ['USD', 'COP'];
 type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
 
-export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange, user }: InvestmentsProps) {
+export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
@@ -654,13 +652,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select
+                <CurrencySelect
                   value={stockForm.currency}
-                  onChange={(e) => setStockForm({ ...stockForm, currency: e.target.value as Currency })}
+                  onChange={(c) => setStockForm({ ...stockForm, currency: c })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -836,13 +832,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
               )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                <select
+                <CurrencySelect
                   value={cryptoForm.currency}
-                  onChange={(e) => setCryptoForm({ ...cryptoForm, currency: e.target.value as Currency })}
+                  onChange={(c) => setCryptoForm({ ...cryptoForm, currency: c })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -956,13 +950,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                    <select
+                    <CurrencySelect
                       value={fixedForm.currency}
-                      onChange={(e) => setFixedForm({ ...fixedForm, currency: e.target.value as Currency })}
+                      onChange={(c) => setFixedForm({ ...fixedForm, currency: c })}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                    >
-                      {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                    />
                   </div>
                 </div>
               </>
@@ -1047,13 +1039,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <select
+              <CurrencySelect
                 value={variableForm.currency}
-                onChange={(e) => setVariableForm({ ...variableForm, currency: e.target.value as Currency })}
+                onChange={(c) => setVariableForm({ ...variableForm, currency: c })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                {currencies.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              />
             </div>
           </div>
           <div>
@@ -1118,15 +1108,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           <h1 className="text-xl font-bold text-gray-800">Investments</h1>
           <div className="flex items-center gap-2">
             <label className="text-sm text-gray-600">Currency:</label>
-            <select
+            <CurrencySelect
               value={baseCurrency}
-              onChange={(e) => onCurrencyChange(e.target.value as Currency)}
+              onChange={onCurrencyChange}
               className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
-            >
-              {currencies.map(currency => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
