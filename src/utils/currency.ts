@@ -4,11 +4,6 @@ import { Currency } from '../types';
 const exchangeRates: Record<Currency, number> = {
   USD: 1,
   COP: 0.00024, // 1 COP = 0.00024 USD (approximate)
-  EUR: 1.08,
-  GBP: 1.27,
-  JPY: 0.0067,
-  CAD: 0.74,
-  AUD: 0.66,
 };
 
 // In production, you would fetch real-time rates from an API like:
@@ -31,8 +26,8 @@ export const formatCurrency = (amount: number, currency: Currency): string => {
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency,
-    minimumFractionDigits: currency === 'JPY' ? 0 : 2,
-    maximumFractionDigits: currency === 'JPY' ? 0 : 2,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
   return formatter.format(amount);
 };

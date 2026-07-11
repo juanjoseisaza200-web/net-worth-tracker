@@ -12,7 +12,7 @@ interface DashboardProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+const currencies: Currency[] = ['USD', 'COP'];
 
 const DEFAULT_LAYOUT: DashboardWidgetConfig[] = [
   { id: 'assetAllocation', visible: true, order: 0 },

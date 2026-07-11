@@ -1,4 +1,4 @@
-export type Currency = 'USD' | 'COP' | 'EUR' | 'GBP' | 'JPY' | 'CAD' | 'AUD';
+export type Currency = 'USD' | 'COP';
 
 export type AccountType = 'checking' | 'savings' | 'cash' | 'other';
 

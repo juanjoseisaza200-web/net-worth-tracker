@@ -10,7 +10,7 @@ interface AccountsProps {
     onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+const currencies: Currency[] = ['USD', 'COP'];
 const accountTypes: { value: AccountType; label: string }[] = [
     { value: 'checking', label: 'Checking' },
     { value: 'savings', label: 'Savings' },

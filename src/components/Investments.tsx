@@ -18,7 +18,7 @@ interface InvestmentsProps {
   user: User | null;
 }
 
-const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+const currencies: Currency[] = ['USD', 'COP'];
 type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
 
 export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange, user }: InvestmentsProps) {

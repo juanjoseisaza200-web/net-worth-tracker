@@ -12,7 +12,7 @@ interface ExpensesProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+const currencies: Currency[] = ['USD', 'COP'];
 const expenseCategories = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
 const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';

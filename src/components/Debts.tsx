@@ -10,7 +10,7 @@ interface DebtsProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-const currencies: Currency[] = ['USD', 'COP', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD'];
+const currencies: Currency[] = ['USD', 'COP'];
 
 export default function Debts({ data, setData, baseCurrency, onCurrencyChange }: DebtsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
