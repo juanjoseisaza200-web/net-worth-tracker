@@ -5,7 +5,9 @@ import {
   calculateTotalExpenses,
   calculateTotalIncome,
   recordNetWorthSnapshot,
+  calculateCategoryBreakdown,
 } from './calculations';
+import { Expense } from '../types';
 
 const baseData = (): AppData => ({
   accounts: [{ id: 'a', name: 'Checking', balance: 1000, currency: 'USD', type: 'checking' }],
@@ -58,6 +60,31 @@ describe('recordNetWorthSnapshot', () => {
     out = recordNetWorthSnapshot(changed);
     expect(out.netWorthHistory).toHaveLength(1);
     expect(out.netWorthHistory![0].value).toBe(3120); // +1000 cash
+  });
+});
+
+describe('calculateCategoryBreakdown', () => {
+  const exp = (over: Partial<Expense>): Expense => ({
+    id: Math.random().toString(), amount: 0, currency: 'USD', description: '',
+    category: 'Other', date: '2026-03-01', accountId: 'a', ...over,
+  });
+
+  it('sums by category, sorts descending, and computes percentages', () => {
+    const out = calculateCategoryBreakdown([
+      exp({ amount: 100, category: 'Food' }),
+      exp({ amount: 50, category: 'Food' }),
+      exp({ amount: 300, category: 'Bills' }),
+    ], 'USD');
+
+    expect(out).toHaveLength(2);
+    expect(out[0]).toEqual({ category: 'Bills', value: 300, percentage: (300 / 450) * 100 });
+    expect(out[1].category).toBe('Food');
+    expect(out[1].value).toBe(150);
+    expect(out.reduce((s, e) => s + e.percentage, 0)).toBeCloseTo(100, 6);
+  });
+
+  it('returns an empty array when there are no expenses', () => {
+    expect(calculateCategoryBreakdown([], 'USD')).toEqual([]);
   });
 });
 

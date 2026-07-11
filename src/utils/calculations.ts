@@ -1,4 +1,4 @@
-import { AppData, Currency } from '../types';
+import { AppData, Currency, Expense } from '../types';
 import { convertCurrency } from './currency';
 
 export const calculateNetWorth = (data: AppData, targetCurrency: Currency): number => {
@@ -106,6 +106,38 @@ export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currenc
   });
 
   return exposureList.sort((a, b) => b.percentage - a.percentage);
+};
+
+export interface CategoryBreakdownEntry {
+  category: string;
+  value: number;
+  percentage: number;
+}
+
+/**
+ * Total spending per expense category, converted to `targetCurrency`, sorted by
+ * value descending. `percentage` is each category's share of the total.
+ */
+export const calculateCategoryBreakdown = (
+  expenses: Expense[],
+  targetCurrency: Currency
+): CategoryBreakdownEntry[] => {
+  const totals: Record<string, number> = {};
+  expenses.forEach(exp => {
+    const value = convertCurrency(exp.amount, exp.currency, targetCurrency);
+    totals[exp.category] = (totals[exp.category] || 0) + value;
+  });
+
+  const grandTotal = Object.values(totals).reduce((sum, v) => sum + v, 0);
+  if (grandTotal === 0) return [];
+
+  return Object.entries(totals)
+    .map(([category, value]) => ({
+      category,
+      value,
+      percentage: (value / grandTotal) * 100,
+    }))
+    .sort((a, b) => b.value - a.value);
 };
 
 export interface AssetAllocation {

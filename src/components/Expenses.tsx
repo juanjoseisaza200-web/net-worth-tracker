@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, Wallet } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, Wallet, Search } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
-import { calculateTotalIncome } from '../utils/calculations';
+import { calculateTotalIncome, calculateCategoryBreakdown } from '../utils/calculations';
 import { formatDateForDisplay } from '../utils/date';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
@@ -31,6 +32,9 @@ const PERIOD_TITLES: Record<ExpensePeriod, string> = {
   fortnight: 'This Fortnight',
 };
 
+// Palette for the spending-by-category chart, assigned by index.
+const CATEGORY_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#6b7280', '#14b8a6'];
+
 // True if a YYYY-MM-DD date falls in the selected window relative to today.
 // 'fortnight' is the current half-month (days 1–15, or 16–end).
 const isInPeriod = (dateStr: string, period: ExpensePeriod): boolean => {
@@ -45,6 +49,9 @@ const isInPeriod = (dateStr: string, period: ExpensePeriod): boolean => {
 export default function Expenses({ data, setData, baseCurrency, onCurrencyChange }: ExpensesProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('expenses');
   const [period, setPeriod] = useState<ExpensePeriod>('all');
+  const [accountFilter, setAccountFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
@@ -365,7 +372,20 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     });
   };
 
-  const filteredExpenses = data.expenses.filter(exp => isInPeriod(exp.date, period));
+  // Base set for the chart: period + account + search (NOT category), so the
+  // breakdown always shows the full category split for the window.
+  const searchLower = search.trim().toLowerCase();
+  const baseFiltered = data.expenses.filter(exp =>
+    isInPeriod(exp.date, period) &&
+    (accountFilter === 'all' || exp.accountId === accountFilter) &&
+    (searchLower === '' || exp.description.toLowerCase().includes(searchLower))
+  );
+  // List + summary additionally honour the category filter.
+  const filteredExpenses = baseFiltered.filter(exp =>
+    categoryFilter === 'all' || exp.category === categoryFilter
+  );
+  const categoryBreakdown = calculateCategoryBreakdown(baseFiltered, baseCurrency);
+  const hasActiveFilters = period !== 'all' || accountFilter !== 'all' || categoryFilter !== 'all' || searchLower !== '';
 
   // Resolve the human-readable name of the account a transaction came from.
   const accountNameById = (id: string) =>
@@ -762,6 +782,73 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         </div>
       )}
 
+      {/* Search + account/category filters (expenses) */}
+      {viewMode === 'expenses' && (
+        <div className="bg-white rounded-lg shadow p-4 space-y-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search expenses..."
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <select
+              value={accountFilter}
+              onChange={(e) => setAccountFilter(e.target.value)}
+              className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="all">All accounts</option>
+              {(data.accounts || []).map(a => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            >
+              <option value="all">All categories</option>
+              {expenseCategories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Spending-by-category chart (expenses) */}
+      {viewMode === 'expenses' && categoryBreakdown.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-4">
+          <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Spending by Category</h2>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                {categoryBreakdown.map((entry, i) => (
+                  <Cell key={entry.category} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(v) => formatCurrency(Number(v), baseCurrency)} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="space-y-2 mt-2">
+            {categoryBreakdown.map((entry, i) => (
+              <div key={entry.category} className="flex justify-between items-center text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
+                  <span className="font-medium text-gray-700">{entry.category}</span>
+                  <span className="text-gray-500">({entry.percentage.toFixed(1)}%)</span>
+                </div>
+                <div className="font-semibold text-gray-900">{formatCurrency(entry.value, baseCurrency)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Summary Cards */}
       {viewMode === 'expenses' && (
         <div className="bg-white rounded-lg shadow p-4">
@@ -876,7 +963,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             </div>
           ) : filteredExpenses.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
-              No expenses in {PERIOD_TITLES[period].toLowerCase()}.
+              {hasActiveFilters ? 'No expenses match these filters.' : 'No expenses recorded yet.'}
             </div>
           ) : (
             <div className="flex flex-col">
