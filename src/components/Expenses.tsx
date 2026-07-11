@@ -244,7 +244,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         ...data,
         recurringIncomes: data.recurringIncomes.map(rec =>
           rec.id === editingRecurring.id
-            ? { ...recurringForm, id: rec.id, amount }
+            // Preserve lastRunMonth — recurringForm doesn't carry it, and dropping
+            // it makes processAutomations re-fire the deposit (duplicate income).
+            ? { ...recurringForm, id: rec.id, amount, lastRunMonth: editingRecurring.lastRunMonth }
             : rec
         ),
       });

@@ -177,7 +177,9 @@ export function processAutomations(data: AppData): { newData: AppData; messages:
           currency: recurring.currency,
           description: recurring.description,
           category: recurring.category,
-          date: now.toISOString().split('T')[0], // YYYY-MM-DD
+          // Local YYYY-MM-DD (not UTC) so it lands in the correct month for the
+          // income totals, which parse local dates. lastRunMonth is local too.
+          date: `${year}-${String(month + 1).padStart(2, '0')}-${String(date).padStart(2, '0')}`,
           accountId: targetAcc.id
         };
         newData.incomes.push(newIncome);

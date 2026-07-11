@@ -91,6 +91,20 @@ describe('processAutomations', () => {
     expect(newData.recurringIncomes[0].lastRunMonth).toBe('2026-01');
   });
 
+  it('does not re-deposit a recurring income already run this month', () => {
+    const data = twoAccounts();
+    data.recurringIncomes = [{
+      id: 'r1', amount: 200, currency: 'USD', description: 'Salary', category: 'Salary',
+      dayOfMonth: 1, isActive: true, accountId: 'd', lastRunMonth: '2026-01',
+    }];
+
+    const { newData, messages } = processAutomations(data);
+
+    expect(messages).toHaveLength(0);
+    expect(newData.accounts.find(a => a.id === 'd')!.balance).toBe(0);
+    expect(newData.incomes).toHaveLength(0);
+  });
+
   it('is a no-op when there are no automations or recurring incomes', () => {
     const data = twoAccounts();
     const { newData, messages } = processAutomations(data);

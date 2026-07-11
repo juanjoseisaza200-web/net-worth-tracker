@@ -20,11 +20,18 @@ const defaultData: AppData = {
 };
 
 export const migrateData = (data: any): AppData => {
+  // Backfill every array the calculators dereference unconditionally
+  // (calculateNetWorth etc. do data.stocks.forEach(...) with no guard), so a
+  // partial/legacy/imported doc can't crash on a missing field.
   if (!data.incomes) data.incomes = [];
   if (!data.recurringIncomes) data.recurringIncomes = [];
   if (!data.expenses) data.expenses = [];
   if (!data.debts) data.debts = [];
   if (!data.netWorthHistory) data.netWorthHistory = [];
+  if (!data.stocks) data.stocks = [];
+  if (!data.crypto) data.crypto = [];
+  if (!data.fixedIncome) data.fixedIncome = [];
+  if (!data.variableInvestments) data.variableInvestments = [];
 
   // Sanitize currencies before anything reads them (baseCurrency is used to
   // build the default account below, and convertCurrency runs on every record).
@@ -32,6 +39,7 @@ export const migrateData = (data: any): AppData => {
   const currencyBearingArrays = [
     'accounts', 'expenses', 'incomes', 'recurringIncomes', 'stocks',
     'crypto', 'fixedIncome', 'variableInvestments', 'debts', 'activityLogs',
+    'netWorthHistory',
   ];
   currencyBearingArrays.forEach(key => {
     if (Array.isArray(data[key])) {
@@ -120,10 +128,11 @@ export const saveDataToCloud = async (userId: string, data: AppData): Promise<vo
 export const subscribeToData = (userId: string, onDataChange: (data: AppData) => void): () => void => {
   const docRef = doc(db, "users", userId);
   const unsubscribe = onSnapshot(docRef, (docSnap) => {
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      onDataChange(migrateData(data));
-    }
+    // For a brand-new user (or a deleted doc) the snapshot won't exist yet.
+    // Still deliver a fresh default AppData so the app finishes loading and the
+    // first save creates the doc — otherwise it hangs on the loading spinner.
+    const data = docSnap.exists() ? docSnap.data() : {};
+    onDataChange(migrateData(data));
   }, (error) => {
     console.error("Error subscribing to data:", error);
   });

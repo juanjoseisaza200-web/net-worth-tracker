@@ -12,7 +12,7 @@ interface SettingsProps {
     onSync: () => Promise<void>;
     onHardReset?: () => void;
     data: AppData;
-    setData: (data: AppData) => void;
+    setData: (data: AppData) => void | Promise<void>;
 }
 
 export default function Settings({ user, onLogout, onSync, data, setData }: SettingsProps) {
@@ -28,8 +28,12 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
         a.href = url;
         const today = new Date().toISOString().split('T')[0];
         a.download = `net-worth-backup-${today}.json`;
+        // Append to the DOM before clicking and defer the revoke — some mobile
+        // browsers won't start the download otherwise.
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     };
 
     const handleImportClick = () => fileInputRef.current?.click();
@@ -43,7 +47,7 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                 throw new Error('This does not look like a Net Worth Tracker backup.');
             }
             if (window.confirm('Importing will REPLACE all of your current data with this file. Continue?')) {
-                setData(migrateData(parsed));
+                await setData(migrateData(parsed));
                 alert('Data imported successfully.');
             }
         } catch (err: any) {

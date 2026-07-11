@@ -133,7 +133,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         if (s.id === editingItem.id) {
           const updated: Stock = {
             ...s,
-            symbol: stockForm.symbol,
+            symbol: stockForm.symbol.toUpperCase(),
             shares: shares,
             purchasePrice: purchasePrice,
             currency: stockForm.currency,
