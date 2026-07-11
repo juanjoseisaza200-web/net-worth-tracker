@@ -8,6 +8,7 @@ import AutocompleteInput, { Suggestion } from './AutocompleteInput';
 import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
+import { parseAmount } from '../utils/number';
 
 interface InvestmentsProps {
   data: AppData;
@@ -102,19 +103,32 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const handleStockSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Calculate shares if in money mode
-    let shares = parseFloat(stockForm.shares);
-    const purchasePrice = parseFloat(stockForm.purchasePrice);
+    const purchasePrice = parseAmount(stockForm.purchasePrice);
+    if (purchasePrice === null || purchasePrice <= 0) {
+      alert('Please enter a valid purchase price greater than 0.');
+      return;
+    }
 
-    if (stockForm.inputMode === 'money' && stockForm.moneyAmount && purchasePrice > 0) {
-      const moneyAmount = parseFloat(stockForm.moneyAmount);
-      // Increase precision to 8 decimal places to preserve exact monetary value
+    // Derive shares from the money amount when in "money" mode, else read directly.
+    let shares: number;
+    if (stockForm.inputMode === 'money' && stockForm.moneyAmount) {
+      const moneyAmount = parseAmount(stockForm.moneyAmount);
+      if (moneyAmount === null || moneyAmount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
+      // 8 decimal places to preserve exact monetary value
       shares = Math.round((moneyAmount / purchasePrice) * 100000000) / 100000000;
     } else {
-      // Also allow higher precision for direct share input if needed, or keep it standard. 
-      // Let's use 8 decimals here too to be consistent and allow fractional shares.
-      shares = Math.round(shares * 100000000) / 100000000;
+      const parsedShares = parseAmount(stockForm.shares);
+      if (parsedShares === null || parsedShares <= 0) {
+        alert('Please enter a valid number of shares greater than 0.');
+        return;
+      }
+      shares = Math.round(parsedShares * 100000000) / 100000000;
     }
+
+    const currentPrice = parseAmount(stockForm.currentPrice);
 
     if (editingItem && editingItem.type === 'stock') {
       const updatedList = data.stocks.map(s => {
@@ -126,8 +140,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             purchasePrice: purchasePrice,
             currency: stockForm.currency,
           };
-          if (stockForm.currentPrice) {
-            updated.currentPrice = parseFloat(stockForm.currentPrice);
+          if (currentPrice !== null) {
+            updated.currentPrice = currentPrice;
           } else {
             delete updated.currentPrice;
           }
@@ -144,8 +158,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         purchasePrice: purchasePrice,
         currency: stockForm.currency,
       };
-      if (stockForm.currentPrice) {
-        newStock.currentPrice = parseFloat(stockForm.currentPrice);
+      if (currentPrice !== null) {
+        newStock.currentPrice = currentPrice;
       }
       setData({ ...data, stocks: [...data.stocks, newStock] });
     }
@@ -155,20 +169,31 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const handleCryptoSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Calculate amount if in money mode
-    let amount: number;
-    const purchasePrice = parseFloat(cryptoForm.purchasePrice);
+    const purchasePrice = parseAmount(cryptoForm.purchasePrice);
+    if (purchasePrice === null || purchasePrice <= 0) {
+      alert('Please enter a valid purchase price greater than 0.');
+      return;
+    }
 
-    if (cryptoForm.inputMode === 'money' && cryptoForm.moneyAmount && purchasePrice > 0) {
-      const moneyAmount = parseFloat(cryptoForm.moneyAmount);
-      // For crypto, preserve 8 decimal places (same as input step)
+    // Derive coin amount from the money amount when in "money" mode, else read directly.
+    let amount: number;
+    if (cryptoForm.inputMode === 'money' && cryptoForm.moneyAmount) {
+      const moneyAmount = parseAmount(cryptoForm.moneyAmount);
+      if (moneyAmount === null || moneyAmount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
       amount = Math.round((moneyAmount / purchasePrice) * 100000000) / 100000000;
     } else {
-      // Use amount from form (coins mode)
-      amount = parseFloat(cryptoForm.amount) || 0;
-      // Round to 8 decimal places for crypto
-      amount = Math.round(amount * 100000000) / 100000000;
+      const parsedAmount = parseAmount(cryptoForm.amount);
+      if (parsedAmount === null || parsedAmount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
+      amount = Math.round(parsedAmount * 100000000) / 100000000;
     }
+
+    const currentPrice = parseAmount(cryptoForm.currentPrice);
 
     if (editingItem && editingItem.type === 'crypto') {
       const updatedList = data.crypto.map(c => {
@@ -180,8 +205,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             purchasePrice: purchasePrice,
             currency: cryptoForm.currency,
           };
-          if (cryptoForm.currentPrice) {
-            updated.currentPrice = parseFloat(cryptoForm.currentPrice);
+          if (currentPrice !== null) {
+            updated.currentPrice = currentPrice;
           } else {
             delete updated.currentPrice;
           }
@@ -198,8 +223,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         purchasePrice: purchasePrice,
         currency: cryptoForm.currency,
       };
-      if (cryptoForm.currentPrice) {
-        newCrypto.currentPrice = parseFloat(cryptoForm.currentPrice);
+      if (currentPrice !== null) {
+        newCrypto.currentPrice = currentPrice;
       }
       setData({ ...data, crypto: [...data.crypto, newCrypto] });
     }
@@ -212,7 +237,19 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     // If linked, we can set fake static names/amounts since it reads dynamically from the account
     const isLinked = !!fixedForm.linkedAccountId;
     const name = isLinked ? 'Linked Account' : fixedForm.name;
-    const amount = isLinked ? 0 : parseFloat(fixedForm.amount);
+
+    // Linked entries read their value from the account, so the amount is 0 by design.
+    let amount = 0;
+    if (!isLinked) {
+      const parsedAmount = parseAmount(fixedForm.amount);
+      if (parsedAmount === null || parsedAmount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
+      amount = parsedAmount;
+    }
+
+    const interestRate = parseAmount(fixedForm.interestRate) ?? 0;
 
     if (editingItem && editingItem.type === 'fixed') {
       const updatedList = data.fixedIncome.map(f => {
@@ -221,7 +258,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             ...f,
             name: name,
             amount: amount,
-            interestRate: parseFloat(fixedForm.interestRate),
+            interestRate,
             currency: fixedForm.currency,
           };
           if (fixedForm.maturityDate) {
@@ -244,7 +281,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         id: Date.now().toString(),
         name: name,
         amount: amount,
-        interestRate: parseFloat(fixedForm.interestRate),
+        interestRate,
         currency: fixedForm.currency,
       };
       if (fixedForm.maturityDate) {
@@ -260,17 +297,25 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
   const handleVariableSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    const amount = parseAmount(variableForm.amount);
+    if (amount === null || amount <= 0) {
+      alert('Please enter a valid amount greater than 0.');
+      return;
+    }
+    const currentValue = parseAmount(variableForm.currentValue);
+
     if (editingItem && editingItem.type === 'variable') {
       const updatedList = data.variableInvestments.map(v => {
         if (v.id === editingItem.id) {
           const updated: VariableInvestment = {
             ...v,
             name: variableForm.name,
-            amount: parseFloat(variableForm.amount),
+            amount,
             currency: variableForm.currency,
           };
-          if (variableForm.currentValue) {
-            updated.currentValue = parseFloat(variableForm.currentValue);
+          if (currentValue !== null) {
+            updated.currentValue = currentValue;
           } else {
             delete updated.currentValue;
           }
@@ -283,12 +328,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       const newVariable: VariableInvestment = {
         id: Date.now().toString(),
         name: variableForm.name,
-        amount: parseFloat(variableForm.amount),
+        amount,
         currency: variableForm.currency,
         type: 'other',
       };
-      if (variableForm.currentValue) {
-        newVariable.currentValue = parseFloat(variableForm.currentValue);
+      if (currentValue !== null) {
+        newVariable.currentValue = currentValue;
       }
       setData({ ...data, variableInvestments: [...data.variableInvestments, newVariable] });
     }

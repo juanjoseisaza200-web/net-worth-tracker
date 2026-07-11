@@ -4,6 +4,7 @@ import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome } from '../utils/calculations';
 import { formatDateForDisplay } from '../utils/date';
+import { parseAmount } from '../utils/number';
 
 interface ExpensesProps {
   data: AppData;
@@ -56,6 +57,12 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     e.preventDefault();
     if (!expenseForm.accountId) return; // Require account
 
+    const amount = parseAmount(expenseForm.amount);
+    if (amount === null || amount <= 0) {
+      alert('Please enter a valid amount greater than 0.');
+      return;
+    }
+
     let newAccounts = [...(data.accounts || [])];
 
     if (editingExpense) {
@@ -67,7 +74,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         }
         if (acc.id === expenseForm.accountId) {
           // Deduct new account
-          newBalance -= convertCurrency(parseFloat(expenseForm.amount), expenseForm.currency, acc.currency);
+          newBalance -= convertCurrency(amount, expenseForm.currency, acc.currency);
         }
         return { ...acc, balance: newBalance };
       });
@@ -77,7 +84,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         accounts: newAccounts,
         expenses: data.expenses.map(exp =>
           exp.id === editingExpense.id
-            ? { ...expenseForm, id: exp.id, amount: parseFloat(expenseForm.amount) }
+            ? { ...expenseForm, id: exp.id, amount }
             : exp
         ),
       });
@@ -85,7 +92,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     } else {
       const newExpense: Expense = {
         id: Date.now().toString(),
-        amount: parseFloat(expenseForm.amount),
+        amount,
         currency: expenseForm.currency,
         description: expenseForm.description,
         category: expenseForm.category,
@@ -122,6 +129,12 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     e.preventDefault();
     if (!incomeForm.accountId) return; // Require account
 
+    const amount = parseAmount(incomeForm.amount);
+    if (amount === null || amount <= 0) {
+      alert('Please enter a valid amount greater than 0.');
+      return;
+    }
+
     let newAccounts = [...(data.accounts || [])];
 
     if (editingIncome) {
@@ -133,7 +146,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         }
         if (acc.id === incomeForm.accountId) {
           // Add to new account
-          newBalance += convertCurrency(parseFloat(incomeForm.amount), incomeForm.currency, acc.currency);
+          newBalance += convertCurrency(amount, incomeForm.currency, acc.currency);
         }
         return { ...acc, balance: newBalance };
       });
@@ -143,7 +156,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         accounts: newAccounts,
         incomes: data.incomes.map(inc =>
           inc.id === editingIncome.id
-            ? { ...incomeForm, id: inc.id, amount: parseFloat(incomeForm.amount) }
+            ? { ...incomeForm, id: inc.id, amount }
             : inc
         ),
       });
@@ -151,7 +164,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     } else {
       const newIncome: Income = {
         id: Date.now().toString(),
-        amount: parseFloat(incomeForm.amount),
+        amount,
         currency: incomeForm.currency,
         description: incomeForm.description,
         category: incomeForm.category,
@@ -187,12 +200,18 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   const handleRecurringSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const amount = parseAmount(recurringForm.amount);
+    if (amount === null || amount <= 0) {
+      alert('Please enter a valid amount greater than 0.');
+      return;
+    }
+
     if (editingRecurring) {
       setData({
         ...data,
         recurringIncomes: data.recurringIncomes.map(rec =>
           rec.id === editingRecurring.id
-            ? { ...recurringForm, id: rec.id, amount: parseFloat(recurringForm.amount) }
+            ? { ...recurringForm, id: rec.id, amount }
             : rec
         ),
       });
@@ -200,7 +219,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     } else {
       const newRecurring: RecurringIncome = {
         id: Date.now().toString(),
-        amount: parseFloat(recurringForm.amount),
+        amount,
         currency: recurringForm.currency,
         description: recurringForm.description,
         category: recurringForm.category,

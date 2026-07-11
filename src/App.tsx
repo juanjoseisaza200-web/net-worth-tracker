@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, TrendingUp, DollarSign, Building2, Users } from 'lucide-react';
 import Dashboard from './components/Dashboard';
@@ -33,6 +33,9 @@ function App() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [ratesLoaded, setRatesLoaded] = useState(false);
+  // Holds the active Firestore snapshot unsubscribe so it can be torn down
+  // before re-subscribing or on unmount (prevents stacked listeners).
+  const dataUnsubRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     // Fetch live exchange rates on boot
@@ -47,16 +50,27 @@ function App() {
     const initAuth = async () => {
       const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
         if (!mounted) return;
+
+        // Tear down any previous Firestore data subscription before (re)subscribing.
+        // onAuthStateChanged can fire more than once (token refresh, re-login); without
+        // this, every firing would stack another onSnapshot listener that never gets
+        // cleaned up and re-runs the automations->save path, leaking listeners and
+        // compounding cloud writes/alerts.
+        if (dataUnsubRef.current) {
+          dataUnsubRef.current();
+          dataUnsubRef.current = null;
+        }
+
         try {
           setUser(currentUser);
           if (currentUser) {
             // Subscribe to real-time cloud data
             console.log("Subscribing to cloud data...");
-            subscribeToData(currentUser.uid, async (cloudData) => {
+            dataUnsubRef.current = subscribeToData(currentUser.uid, async (cloudData) => {
               if (mounted) {
                 console.log("Cloud data updated", cloudData);
                 const { newData, messages } = (await import('./utils/automations')).processAutomations(cloudData);
-                
+
                 if (messages.length > 0) {
                   try {
                     await saveDataToCloud(currentUser.uid, newData);
@@ -69,18 +83,15 @@ function App() {
                   // Sync cloud data to local storage so next boot is fresh
                   saveData(cloudData);
                   // Only update the view currencies to the new global default if they were the old global default,
-                  // or just let them stay as is for this session. 
+                  // or just let them stay as is for this session.
                   setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
                   setLoading(false);
                 }
               }
             });
-
-            // Cleanup data subscription when auth state changes or component unmounts
-            // Note: In a real app we might want to manage this subscription more carefully
-            // but for now, this ensures we get updates. 
-            // Ideally we'd store the unsubscribe function in a ref or state.
           } else {
+            // Signed out: block cloud saves until the next login re-syncs.
+            setIsCloudSynced(false);
             setLoading(false);
           }
         } catch (err: any) {
@@ -96,6 +107,11 @@ function App() {
 
     return () => {
       mounted = false;
+      // Tear down both the data snapshot listener and the auth listener.
+      if (dataUnsubRef.current) {
+        dataUnsubRef.current();
+        dataUnsubRef.current = null;
+      }
       unsubscribePromise.then(unsub => unsub());
     };
   }, []); // Only run on mount, but depends on load functions

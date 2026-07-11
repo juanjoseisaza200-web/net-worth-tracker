@@ -92,10 +92,26 @@ src/
 
 ## Data Storage
 
-All data is stored locally in your browser's localStorage. This means:
-- Your data stays on your device
-- No account or internet connection required
-- Data persists between sessions
+Data is stored per-user in Cloud Firestore (one document at `users/{uid}`), and
+mirrored to the browser's `localStorage` as an offline cache. Signing in with
+Google is required; there is no local-only mode.
+
+## Firestore Security Rules
+
+Access control lives entirely in Firestore security rules — the Firebase web
+config in `src/firebase.ts` is public by design, so the rules are the security
+boundary for the whole app. The rules are version-controlled in `firestore.rules`
+(a signed-in user can read/write **only** their own `users/{uid}` document).
+
+Deploy them whenever they change:
+
+```bash
+firebase deploy --only firestore:rules
+```
+
+> ⚠️ If you never deployed these rules, verify in the Firebase console that the
+> database is **not** in open "test mode" — otherwise anyone can read/write every
+> user's data.
 
 ## Future Enhancements
 

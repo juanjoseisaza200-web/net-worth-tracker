@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2, PlayCircle } from 'lucide-react';
 import { AppData, Account, AccountType, Currency, Automation, ActivityLog } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
+import { parseAmount } from '../utils/number';
 
 interface AccountsProps {
     data: AppData;
@@ -64,7 +65,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                         name: addForm.name,
                         type: addForm.type,
                         currency: addForm.currency,
-                        balance: parseFloat(addForm.balance || '0'),
+                        balance: parseAmount(addForm.balance) ?? 0,
                     }
                     : acc
             );
@@ -79,7 +80,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                 name: addForm.name,
                 type: addForm.type,
                 currency: addForm.currency,
-                balance: parseFloat(addForm.balance || '0'),
+                balance: parseAmount(addForm.balance) ?? 0,
             };
 
             setData({
@@ -147,12 +148,26 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     };
 
     const handleDeleteAccount = (id: string) => {
-        // Check if account has tied transactions
+        // Block deletion if anything still references this account, otherwise we'd
+        // orphan the reference: an automation would fire against a non-existent
+        // account, and recurring incomes / linked fixed income would dangle.
         const hasExpenses = data.expenses.some(e => e.accountId === id);
         const hasIncomes = data.incomes.some(i => i.accountId === id);
+        const hasRecurring = (data.recurringIncomes || []).some(r => r.accountId === id);
+        const hasAutomations = (data.automations || []).some(
+            a => a.sourceAccountId === id || a.destinationAccountId === id
+        );
+        const hasLinkedFixed = (data.fixedIncome || []).some(f => f.linkedAccountId === id);
 
-        if (hasExpenses || hasIncomes) {
-            alert("Cannot delete an account that has expenses or incomes attached to it. Please reassign them first.");
+        if (hasExpenses || hasIncomes || hasRecurring || hasAutomations || hasLinkedFixed) {
+            const linked = [
+                hasExpenses && 'expenses',
+                hasIncomes && 'incomes',
+                hasRecurring && 'recurring incomes',
+                hasAutomations && 'automations',
+                hasLinkedFixed && 'linked fixed income',
+            ].filter(Boolean).join(', ');
+            alert(`Cannot delete an account that still has ${linked} attached to it. Please reassign or remove them first.`);
             return;
         }
 
@@ -190,9 +205,14 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         };
 
         if (automationForm.type === 'transfer') {
-            newAutomation.amount = parseFloat(automationForm.amount || '0');
+            const parsedAmount = parseAmount(automationForm.amount);
+            if (parsedAmount === null || parsedAmount <= 0) {
+                alert('Please enter a valid transfer amount greater than 0.');
+                return;
+            }
+            newAutomation.amount = parsedAmount;
         } else if (automationForm.type === 'sweep') {
-            newAutomation.keepAmount = parseFloat(automationForm.keepAmount || '0');
+            newAutomation.keepAmount = parseAmount(automationForm.keepAmount) ?? 0;
         }
 
         const existingAutomations = data.automations || [];

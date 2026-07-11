@@ -79,8 +79,11 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
     closeModal();
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm('Are you sure you want to delete this reminder?')) {
+  // "Settling" a debt removes it from the reminder list (there is no settled
+  // flag in the model). Named to match the button's "Mark Settled" label so the
+  // copy and the action agree.
+  const handleSettle = (id: string) => {
+    if (window.confirm('Mark this as settled? It will be removed from your reminders.')) {
       const newDebts = debts.filter(d => d.id !== id);
       setData({ ...data, debts: newDebts });
     }
@@ -167,7 +170,7 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
                   )}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => openModal(debt)} className="text-gray-400 hover:text-blue-500"><Edit2 size={16} /></button>
-                    <button onClick={() => handleDelete(debt.id)} className="text-gray-400 hover:text-green-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
+                    <button onClick={() => handleSettle(debt.id)} className="text-gray-400 hover:text-green-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
                   </div>
                 </div>
               </div>
@@ -212,7 +215,7 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
                   )}
                   <div className="flex gap-2 mt-2">
                     <button onClick={() => openModal(debt)} className="text-gray-400 hover:text-blue-500"><Edit2 size={16} /></button>
-                    <button onClick={() => handleDelete(debt.id)} className="text-gray-400 hover:text-red-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
+                    <button onClick={() => handleSettle(debt.id)} className="text-gray-400 hover:text-red-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
                   </div>
                 </div>
               </div>
