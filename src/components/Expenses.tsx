@@ -17,9 +17,34 @@ interface ExpensesProps {
 const expenseCategories = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
 const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';
+type ExpensePeriod = 'all' | 'month' | 'fortnight';
+
+const PERIOD_OPTIONS: { id: ExpensePeriod; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'month', label: 'Month' },
+  { id: 'fortnight', label: 'Fortnight' },
+];
+
+const PERIOD_TITLES: Record<ExpensePeriod, string> = {
+  all: 'All',
+  month: 'This Month',
+  fortnight: 'This Fortnight',
+};
+
+// True if a YYYY-MM-DD date falls in the selected window relative to today.
+// 'fortnight' is the current half-month (days 1–15, or 16–end).
+const isInPeriod = (dateStr: string, period: ExpensePeriod): boolean => {
+  if (period === 'all') return true;
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const now = new Date();
+  if (y !== now.getFullYear() || m - 1 !== now.getMonth()) return false;
+  if (period === 'month') return true;
+  return now.getDate() <= 15 ? d <= 15 : d >= 16;
+};
 
 export default function Expenses({ data, setData, baseCurrency, onCurrencyChange }: ExpensesProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('expenses');
+  const [period, setPeriod] = useState<ExpensePeriod>('all');
   const [showForm, setShowForm] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
@@ -340,7 +365,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     });
   };
 
-  const totalExpenses = data.expenses.reduce((sum, exp) => {
+  const filteredExpenses = data.expenses.filter(exp => isInPeriod(exp.date, period));
+
+  const totalExpenses = filteredExpenses.reduce((sum, exp) => {
     return sum + convertCurrency(exp.amount, exp.currency, baseCurrency);
   }, 0);
 
@@ -714,20 +741,39 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         </div>
       </div>
 
+      {/* Time period filter (expenses) */}
+      {viewMode === 'expenses' && (
+        <div className="flex gap-2">
+          {PERIOD_OPTIONS.map(opt => (
+            <button
+              key={opt.id}
+              onClick={() => setPeriod(opt.id)}
+              className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
+                period === opt.id ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 border border-gray-200'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Summary Cards */}
       {viewMode === 'expenses' && (
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex justify-between items-center">
             <div>
-              <div className="text-sm text-gray-600">Total Expenses</div>
+              <div className="text-sm text-gray-600">
+                Total Expenses{period !== 'all' ? ` · ${PERIOD_TITLES[period]}` : ''}
+              </div>
               <div className="text-2xl font-bold text-red-600">
                 {formatCompactCurrency(totalExpenses, baseCurrency)}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-gray-600">Total Count</div>
+              <div className="text-sm text-gray-600">Count</div>
               <div className="text-2xl font-bold text-gray-800">
-                {data.expenses.length}
+                {filteredExpenses.length}
               </div>
             </div>
           </div>
@@ -812,17 +858,26 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       {/* Lists */}
       {viewMode === 'expenses' && (
         <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800">All Expenses</h2>
+          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-800">
+              {period === 'all' ? 'All Expenses' : PERIOD_TITLES[period]}
+            </h2>
+            {period !== 'all' && (
+              <span className="text-sm text-gray-500">{filteredExpenses.length} item{filteredExpenses.length === 1 ? '' : 's'}</span>
+            )}
           </div>
           {data.expenses.length === 0 ? (
             <div className="p-8 text-center text-gray-500">
               No expenses recorded yet. Add your first expense!
             </div>
+          ) : filteredExpenses.length === 0 ? (
+            <div className="p-8 text-center text-gray-500">
+              No expenses in {PERIOD_TITLES[period].toLowerCase()}.
+            </div>
           ) : (
             <div className="flex flex-col">
               {(() => {
-                const sortedExpenses = [...data.expenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                 
                 const grouped: { monthYear: string; expenses: Expense[]; total: number }[] = [];
                 
