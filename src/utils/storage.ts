@@ -19,11 +19,12 @@ const defaultData: AppData = {
   },
 };
 
-const migrateData = (data: any): AppData => {
+export const migrateData = (data: any): AppData => {
   if (!data.incomes) data.incomes = [];
   if (!data.recurringIncomes) data.recurringIncomes = [];
   if (!data.expenses) data.expenses = [];
   if (!data.debts) data.debts = [];
+  if (!data.netWorthHistory) data.netWorthHistory = [];
 
   // Sanitize currencies before anything reads them (baseCurrency is used to
   // build the default account below, and convertCurrency runs on every record).

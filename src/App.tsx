@@ -8,6 +8,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
 import Header from './components/Header';
 import { fetchExchangeRates } from './utils/currency';
+import { recordNetWorthSnapshot } from './utils/calculations';
 
 // Route screens are code-split so the initial bundle stays small; each loads on
 // first navigation to that tab.
@@ -122,9 +123,13 @@ function App() {
 
   // User Actions -> Cloud Save
   const handleCloudSave = async (newData: AppData) => {
+    // Record today's net-worth snapshot as a side effect of every explicit save
+    // (deduped per day) so the history/trend chart accumulates over time.
+    const dataToSave = recordNetWorthSnapshot(newData);
+
     // 1. Optimistic Update (Local)
-    setData(newData);
-    saveData(newData);
+    setData(dataToSave);
+    saveData(dataToSave);
 
     if (user) {
       // CRITICAL SAFETY GUARD:
@@ -139,7 +144,7 @@ function App() {
       try {
         setIsSaving(true);
         setSaveError(null);
-        await saveDataToCloud(user.uid, newData);
+        await saveDataToCloud(user.uid, dataToSave);
         setLastSaved(new Date());
       } catch (err) {
         console.error("Save failed", err);

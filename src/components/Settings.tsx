@@ -1,9 +1,10 @@
 import { User } from 'firebase/auth';
-import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff } from 'lucide-react';
-import { useState } from 'react';
+import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff, Download, Upload } from 'lucide-react';
+import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AppData } from '../types';
 import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
+import { migrateData } from '../utils/storage';
 
 interface SettingsProps {
     user: User;
@@ -18,6 +19,41 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
     const [syncing, setSyncing] = useState(false);
     const [fetchingRates, setFetchingRates] = useState(false);
     const autoUpdatePrices = data.settings?.autoUpdatePrices ?? true;
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleExport = () => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const today = new Date().toISOString().split('T')[0];
+        a.download = `net-worth-backup-${today}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
+    const handleImportClick = () => fileInputRef.current?.click();
+
+    const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        try {
+            const parsed = JSON.parse(await file.text());
+            if (!parsed || typeof parsed !== 'object' || !('accounts' in parsed || 'baseCurrency' in parsed)) {
+                throw new Error('This does not look like a Net Worth Tracker backup.');
+            }
+            if (window.confirm('Importing will REPLACE all of your current data with this file. Continue?')) {
+                setData(migrateData(parsed));
+                alert('Data imported successfully.');
+            }
+        } catch (err: any) {
+            console.error('Import failed', err);
+            alert('Could not import this file: ' + (err.message || 'invalid file.'));
+        } finally {
+            // Reset so selecting the same file again still fires onChange.
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
 
     const toggleAutoUpdate = () => {
         setData({
@@ -123,6 +159,43 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                             </div>
                         </div>
                     </button>
+
+                    <button
+                        onClick={handleExport}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-full bg-indigo-50 text-indigo-600">
+                                <Download size={20} />
+                            </div>
+                            <div className="text-left">
+                                <span className="block font-medium text-gray-900">Export Data</span>
+                                <span className="block text-xs text-gray-500">Download a JSON backup of everything</span>
+                            </div>
+                        </div>
+                    </button>
+
+                    <button
+                        onClick={handleImportClick}
+                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 rounded-full bg-indigo-50 text-indigo-600">
+                                <Upload size={20} />
+                            </div>
+                            <div className="text-left">
+                                <span className="block font-medium text-gray-900">Import Data</span>
+                                <span className="block text-xs text-gray-500">Restore from a JSON backup (replaces all data)</span>
+                            </div>
+                        </div>
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="application/json,.json"
+                        onChange={handleImportFile}
+                        className="hidden"
+                    />
 
                     <button
                         onClick={onLogout}

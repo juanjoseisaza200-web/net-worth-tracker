@@ -119,6 +119,12 @@ export interface Debt {
   dueDate?: string;
 }
 
+export interface NetWorthSnapshot {
+  date: string; // YYYY-MM-DD
+  value: number;
+  currency: Currency; // currency `value` is expressed in (the base currency at capture time)
+}
+
 export interface AppData {
   accounts: Account[];
   expenses: Expense[];
@@ -131,6 +137,7 @@ export interface AppData {
   fixedIncome: FixedIncome[];
   variableInvestments: VariableInvestment[];
   debts?: Debt[];
+  netWorthHistory?: NetWorthSnapshot[];
   baseCurrency: Currency;
   settings?: {
     autoUpdatePrices: boolean;

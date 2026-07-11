@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check } from 'lucide-react';
 import { AppData, Currency, DashboardWidgetConfig } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
-import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals } from '../utils/currency';
+import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CurrencySelect from './CurrencySelect';
 
 interface DashboardProps {
@@ -14,17 +15,30 @@ interface DashboardProps {
 }
 
 const DEFAULT_LAYOUT: DashboardWidgetConfig[] = [
-  { id: 'assetAllocation', visible: true, order: 0 },
-  { id: 'currencyExposure', visible: true, order: 1 },
-  { id: 'quickStats', visible: true, order: 2 },
-  { id: 'netMonthly', visible: true, order: 3 },
-  { id: 'cashAccounts', visible: true, order: 4 },
-  { id: 'investmentSummary', visible: true, order: 5 },
-  { id: 'activityLog', visible: true, order: 6 },
-  { id: 'recentExpenses', visible: true, order: 7 },
+  { id: 'netWorthHistory', visible: true, order: 0 },
+  { id: 'assetAllocation', visible: true, order: 1 },
+  { id: 'currencyExposure', visible: true, order: 2 },
+  { id: 'quickStats', visible: true, order: 3 },
+  { id: 'netMonthly', visible: true, order: 4 },
+  { id: 'cashAccounts', visible: true, order: 5 },
+  { id: 'investmentSummary', visible: true, order: 6 },
+  { id: 'activityLog', visible: true, order: 7 },
+  { id: 'recentExpenses', visible: true, order: 8 },
 ];
 
+// Merge any default widgets missing from a user's saved layout (e.g. widgets
+// added in a later version) so new widgets appear instead of staying hidden.
+const mergeLayout = (stored?: DashboardWidgetConfig[]): DashboardWidgetConfig[] => {
+  if (!stored || stored.length === 0) return DEFAULT_LAYOUT;
+  const known = new Set(stored.map(w => w.id));
+  const missing = DEFAULT_LAYOUT
+    .filter(w => !known.has(w.id))
+    .map((w, i) => ({ ...w, order: stored.length + i }));
+  return [...stored, ...missing].sort((a, b) => a.order - b.order);
+};
+
 const WIDGET_NAMES: Record<string, string> = {
+  netWorthHistory: 'Net Worth Trend',
   assetAllocation: 'Asset Allocation',
   currencyExposure: 'Currency Exposure',
   quickStats: 'Quick Stats (Income/Expenses)',
@@ -40,9 +54,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   
   const [layout, setLayout] = useState<DashboardWidgetConfig[]>(
-    data.settings?.dashboardLayout && data.settings.dashboardLayout.length > 0
-      ? data.settings.dashboardLayout.sort((a, b) => a.order - b.order)
-      : DEFAULT_LAYOUT
+    mergeLayout(data.settings?.dashboardLayout)
   );
 
   const now = new Date();
@@ -51,6 +63,10 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
   const netWorth = calculateNetWorth(data, baseCurrency);
   const currencyExposure = calculateCurrencyExposure(data, baseCurrency);
   const assetAllocation = calculateAssetAllocation(data, baseCurrency);
+  const netWorthHistoryData = (data.netWorthHistory || [])
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(h => ({ date: h.date, value: convertCurrency(h.value, h.currency, baseCurrency) }));
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
   const monthlyIncome = calculateTotalIncome(data, baseCurrency, 'month');
   const netMonthly = monthlyIncome - monthlyExpenses;
@@ -94,6 +110,26 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
 
   const renderWidget = (id: string) => {
     switch(id) {
+      case 'netWorthHistory':
+        if (netWorthHistoryData.length < 2) return null;
+        return (
+          <div key={id} className="bg-white rounded-lg shadow p-4">
+            <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Net Worth Trend</h2>
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
+                <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
+                <Tooltip
+                  formatter={(v) => formatCurrency(Number(v), baseCurrency)}
+                  labelFormatter={(d) => formatDateForDisplay(d as string)}
+                />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        );
+
       case 'assetAllocation':
         if (assetAllocation.length === 0) return null;
         return (

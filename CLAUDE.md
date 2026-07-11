@@ -10,9 +10,10 @@ npm run dev      # start Vite dev server on http://localhost:3000
 npm run build    # tsc type-check, then vite build -> dist/
 npm run preview  # serve the production build locally
 npm run lint     # eslint . --ext ts,tsx --max-warnings 0
+npm test         # vitest run — unit tests for the pure utils
 ```
 
-There is no test suite/framework configured in this repo (no Jest/Vitest, no `*.test.*` files). Don't assume one exists — verify changes via `npm run build` (type errors) and `npm run lint`, and by exercising the UI in a browser.
+Tests are Vitest unit tests over the pure logic in `src/utils` (`*.test.ts` next to the code under test: currency, calculations, automations, number, date). There are no component/DOM tests. Beyond `npm test`, verify changes via `npm run build` (type errors) and `npm run lint`, and by exercising the UI in a browser. CI (`.github/workflows/ci.yml`) runs lint + build + test on every push to `main` and on PRs.
 
 ## Architecture
 
@@ -20,7 +21,9 @@ This is a client-only PWA (Vite + React 18 + TypeScript + Tailwind + react-route
 
 ### Data model and persistence flow
 
-Everything the app tracks lives in a single `AppData` object (`src/types.ts`): `accounts`, `expenses`, `incomes`, `recurringIncomes`, `automations`, `activityLogs`, `stocks`, `crypto`, `fixedIncome`, `variableInvestments`, `debts`, `baseCurrency`, `settings`. This whole object is the unit of persistence — one Firestore document per user at `users/{uid}`, mirrored to `localStorage` (`utils/storage.ts`) as an offline cache, not a separate source of truth.
+Everything the app tracks lives in a single `AppData` object (`src/types.ts`): `accounts`, `expenses`, `incomes`, `recurringIncomes`, `automations`, `activityLogs`, `stocks`, `crypto`, `fixedIncome`, `variableInvestments`, `debts`, `netWorthHistory`, `baseCurrency`, `settings`. This whole object is the unit of persistence — one Firestore document per user at `users/{uid}`, mirrored to `localStorage` (`utils/storage.ts`) as an offline cache, not a separate source of truth. Firestore is configured with IndexedDB persistence (`initializeFirestore` + `persistentLocalCache` in `src/firebase.ts`) so reads work offline and offline writes are queued.
+
+`handleCloudSave` records a daily net-worth snapshot into `netWorthHistory` via `recordNetWorthSnapshot` (`utils/calculations.ts`, deduped per `YYYY-MM-DD`) as a side effect of every explicit save; the Dashboard "Net Worth Trend" widget charts it with recharts. Access control lives in `firestore.rules` (version-controlled) — deploy with `firebase deploy --only firestore:rules`.
 
 `App.tsx` is the sole owner of `data` state and hands it down to every route as `data` + a `setData` callback (see the `<Route>` list at the bottom of `App.tsx`). There are two distinct save paths, and using the wrong one is a real footgun:
 - `handleCloudSave` — optimistic local update, then push to Firestore. Guarded by an `isCloudSynced` flag that blocks any cloud write until the initial `subscribeToData` snapshot has been received, specifically to prevent a stale tab from overwriting newer cloud data on load. Use this for anything the user explicitly edits.

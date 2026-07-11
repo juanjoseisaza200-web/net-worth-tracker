@@ -39,6 +39,7 @@ export default defineConfig({
         // and these can be cached independently across deploys.
         manualChunks: {
           firebase: ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+          recharts: ['recharts'],
         },
       },
     },

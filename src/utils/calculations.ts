@@ -43,6 +43,32 @@ export const calculateNetWorth = (data: AppData, targetCurrency: Currency): numb
   return total;
 };
 
+/**
+ * Return a copy of `data` with today's net-worth snapshot recorded in
+ * `netWorthHistory`. Keyed by local YYYY-MM-DD and deduped per day (the day's
+ * entry is overwritten with the latest value), so history grows at most one
+ * point per day. The value is stored in the current baseCurrency.
+ */
+export const recordNetWorthSnapshot = (data: AppData): AppData => {
+  const now = new Date();
+  const dateKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const entry = {
+    date: dateKey,
+    value: calculateNetWorth(data, data.baseCurrency),
+    currency: data.baseCurrency,
+  };
+
+  const history = data.netWorthHistory ? [...data.netWorthHistory] : [];
+  const existingIdx = history.findIndex(h => h.date === dateKey);
+  if (existingIdx >= 0) {
+    history[existingIdx] = entry;
+  } else {
+    history.push(entry);
+  }
+
+  return { ...data, netWorthHistory: history };
+};
+
 export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currency) => {
   const exposureMap: Partial<Record<Currency, number>> = {};
 
