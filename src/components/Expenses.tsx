@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
+import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, Wallet } from 'lucide-react';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome } from '../utils/calculations';
@@ -366,6 +366,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   };
 
   const filteredExpenses = data.expenses.filter(exp => isInPeriod(exp.date, period));
+
+  // Resolve the human-readable name of the account a transaction came from.
+  const accountNameById = (id: string) =>
+    data.accounts?.find(a => a.id === id)?.name || 'Unknown account';
 
   const totalExpenses = filteredExpenses.reduce((sum, exp) => {
     return sum + convertCurrency(exp.amount, exp.currency, baseCurrency);
@@ -910,6 +914,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                               <div className="text-sm text-gray-500 mt-1">
                                 {expense.category} • {formatDateForDisplay(expense.date)}
                               </div>
+                              <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                <Wallet size={11} className="text-gray-400" />
+                                {accountNameById(expense.accountId)}
+                              </div>
                               <div className="text-sm text-gray-400 mt-1">
                                 {formatCurrency(expense.amount, expense.currency)}
                                 {expense.currency !== baseCurrency && (
@@ -989,6 +997,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                               <div className="font-medium text-gray-800 truncate">{income.description}</div>
                               <div className="text-sm text-gray-500 mt-1">
                                 {income.category} • {formatDateForDisplay(income.date)}
+                              </div>
+                              <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                                <Wallet size={11} className="text-gray-400" />
+                                {accountNameById(income.accountId)}
                               </div>
                               <div className="text-sm text-green-600 font-semibold mt-1">
                                 {formatCurrency(income.amount, income.currency)}
