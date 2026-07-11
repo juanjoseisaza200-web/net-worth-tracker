@@ -7,6 +7,7 @@ import { calculateTotalIncome, calculateCategoryBreakdown } from '../utils/calcu
 import { formatDateForDisplay } from '../utils/date';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
+import ChartErrorBoundary from './ChartErrorBoundary';
 
 interface ExpensesProps {
   data: AppData;
@@ -824,16 +825,18 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
       {viewMode === 'expenses' && categoryBreakdown.length > 0 && (
         <div className="bg-white rounded-lg shadow p-4">
           <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Spending by Category</h2>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                {categoryBreakdown.map((entry, i) => (
-                  <Cell key={entry.category} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(v) => formatCurrency(Number(v), baseCurrency)} />
-            </PieChart>
-          </ResponsiveContainer>
+          <ChartErrorBoundary>
+            <ResponsiveContainer width="100%" height={200}>
+              <PieChart>
+                <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
+                  {categoryBreakdown.map((entry, i) => (
+                    <Cell key={entry.category} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip formatter={(v) => formatCurrency(Number(v), baseCurrency)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </ChartErrorBoundary>
           <div className="space-y-2 mt-2">
             {categoryBreakdown.map((entry, i) => (
               <div key={entry.category} className="flex justify-between items-center text-sm">

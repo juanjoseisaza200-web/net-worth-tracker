@@ -6,6 +6,7 @@ import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCu
 import { formatDateForDisplay } from '../utils/date';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CurrencySelect from './CurrencySelect';
+import ChartErrorBoundary from './ChartErrorBoundary';
 
 interface DashboardProps {
   data: AppData;
@@ -122,18 +123,20 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
                   : 'Tracking started today. Once there are at least two days of history, your trend line will appear here.'}
               </div>
             ) : (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
-                  <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
-                  <Tooltip
-                    formatter={(v) => formatCurrency(Number(v), baseCurrency)}
-                    labelFormatter={(d) => formatDateForDisplay(d as string)}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <ChartErrorBoundary>
+                <ResponsiveContainer width="100%" height={200}>
+                  <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
+                    <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
+                    <Tooltip
+                      formatter={(v) => formatCurrency(Number(v), baseCurrency)}
+                      labelFormatter={(d) => formatDateForDisplay(d as string)}
+                    />
+                    <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
             )}
           </div>
         );

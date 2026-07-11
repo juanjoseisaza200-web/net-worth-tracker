@@ -125,6 +125,8 @@ export const calculateCategoryBreakdown = (
   const totals: Record<string, number> = {};
   expenses.forEach(exp => {
     const value = convertCurrency(exp.amount, exp.currency, targetCurrency);
+    // Skip corrupt values so NaN/Infinity never reaches the chart.
+    if (!Number.isFinite(value) || value <= 0) return;
     totals[exp.category] = (totals[exp.category] || 0) + value;
   });
 
