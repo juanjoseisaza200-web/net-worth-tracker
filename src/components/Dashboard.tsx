@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check, Wallet } from 'lucide-react';
 import { AppData, Currency, DashboardWidgetConfig } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
@@ -68,6 +68,10 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
     .slice()
     .sort((a, b) => a.date.localeCompare(b.date))
     .map(h => ({ date: h.date, value: convertCurrency(h.value, h.currency, baseCurrency) }));
+
+  // Resolve the account a transaction came from, for display in Recent Expenses.
+  const accountNameById = (id: string) =>
+    data.accounts?.find(a => a.id === id)?.name || 'Unknown account';
   const monthlyExpenses = calculateTotalExpenses(data, baseCurrency, 'month');
   const monthlyIncome = calculateTotalIncome(data, baseCurrency, 'month');
   const netMonthly = monthlyIncome - monthlyExpenses;
@@ -328,11 +332,15 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
                   .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                   .map(expense => (
                     <div key={expense.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <div>
-                        <div className="font-medium text-gray-800">{expense.description}</div>
+                      <div className="min-w-0 mr-2">
+                        <div className="font-medium text-gray-800 truncate">{expense.description}</div>
                         <div className="text-sm text-gray-500">{expense.category}</div>
+                        <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                          <Wallet size={11} className="text-gray-400" />
+                          {accountNameById(expense.accountId)}
+                        </div>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <div className="font-semibold text-red-600 truncate max-w-[120px]">{formatCurrencyNoDecimals(expense.amount, expense.currency)}</div>
                         <div className="text-xs text-gray-500">{formatDateForDisplay(expense.date)}</div>
                       </div>
