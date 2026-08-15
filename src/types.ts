@@ -1,13 +1,26 @@
 export type Currency = 'USD' | 'COP';
 
-export type AccountType = 'checking' | 'savings' | 'cash' | 'other';
+export type AccountType = 'checking' | 'savings' | 'cash' | 'credit' | 'other';
 
 export interface Account {
   id: string;
   name: string;
+  /**
+   * For `credit` accounts this is the outstanding debt expressed as a negative
+   * number (a card you owe 500k on has a balance of -500000), so the existing
+   * net-worth/transfer maths subtract it without special-casing.
+   */
   balance: number;
   currency: Currency;
   type: AccountType;
+  /** `credit` only: day of the month the statement closes (1-28). */
+  statementDay?: number;
+  /**
+   * `credit` only: YYYY-MM-DD the current statement is due. Set by hand each
+   * cycle — issuers shift it around weekends/holidays, so it isn't derivable
+   * from `statementDay`.
+   */
+  paymentDueDate?: string;
 }
 
 export interface Expense {
@@ -99,9 +112,10 @@ export interface ActivityLog {
   description: string;
   amount: number;
   currency: Currency;
+  /** Omitted on a `cardPayment` someone else paid — no account of ours moved. */
   sourceAccountId?: string;
   destinationAccountId?: string;
-  type: 'automation' | 'manual';
+  type: 'automation' | 'manual' | 'cardPayment';
 }
 
 export interface DashboardWidgetConfig {

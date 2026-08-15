@@ -69,6 +69,22 @@ export const recordNetWorthSnapshot = (data: AppData): AppData => {
   return { ...data, netWorthHistory: history };
 };
 
+/**
+ * Everything owed, as a positive number in `targetCurrency`. Today that's only
+ * credit cards (stored as negative account balances); `debts` is deliberately
+ * excluded, since that tab tracks informal IOUs outside of net worth.
+ */
+export const calculateTotalLiabilities = (data: AppData, targetCurrency: Currency): number => {
+  if (!data.accounts) return 0;
+
+  return data.accounts
+    .filter(acc => acc.type === 'credit' && acc.balance < 0)
+    .reduce((sum, acc) => {
+      const value = convertCurrency(-acc.balance, acc.currency, targetCurrency);
+      return Number.isFinite(value) ? sum + value : sum;
+    }, 0);
+};
+
 export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currency) => {
   const exposureMap: Partial<Record<Currency, number>> = {};
 
@@ -78,7 +94,9 @@ export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currenc
   };
 
   if (data.accounts) {
-    data.accounts.forEach(acc => addExposure(acc.currency, acc.balance));
+    // Credit cards carry a negative balance (debt), which would eat into the
+    // exposure of whatever currency they're in. Exposure is about assets held.
+    data.accounts.filter(acc => acc.type !== 'credit').forEach(acc => addExposure(acc.currency, acc.balance));
   }
   data.stocks.forEach(stock => addExposure(stock.currency, (stock.currentPrice || stock.purchasePrice) * stock.shares));
   data.crypto.forEach(crypto => addExposure(crypto.currency, (crypto.currentPrice || crypto.purchasePrice) * crypto.amount));
@@ -157,7 +175,12 @@ export const calculateAssetAllocation = (data: AppData, targetCurrency: Currency
   let variable = 0;
 
   if (data.accounts) {
-    data.accounts.forEach(acc => cash += convertCurrency(acc.balance, acc.currency, targetCurrency));
+    // Credit cards are a liability, not an allocation of assets — including
+    // them here would subtract debt from the Cash slice. See
+    // calculateTotalLiabilities for the other side of the balance sheet.
+    data.accounts
+      .filter(acc => acc.type !== 'credit')
+      .forEach(acc => cash += convertCurrency(acc.balance, acc.currency, targetCurrency));
   }
   data.stocks.forEach(s => stocks += convertCurrency((s.currentPrice || s.purchasePrice) * s.shares, s.currency, targetCurrency));
   data.crypto.forEach(c => crypto += convertCurrency((c.currentPrice || c.purchasePrice) * c.amount, c.currency, targetCurrency));

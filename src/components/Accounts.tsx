@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2 } from 'lucide-react';
-import { AppData, Account, AccountType, Currency, Automation, ActivityLog } from '../types';
+import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2, CreditCard } from 'lucide-react';
+import { AppData, Account, AccountType, Currency, Automation, ActivityLog, Income } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { parseAmount } from '../utils/number';
+import { formatDateForDisplay } from '../utils/date';
+import { DEFAULT_STATEMENT_DAY, getCardStatement, sumCardPayments, sumInCurrency } from '../utils/creditCard';
 import CurrencySelect from './CurrencySelect';
 
 interface AccountsProps {
@@ -16,8 +18,12 @@ const accountTypes: { value: AccountType; label: string }[] = [
     { value: 'checking', label: 'Checking' },
     { value: 'savings', label: 'Savings' },
     { value: 'cash', label: 'Cash' },
+    { value: 'credit', label: 'Credit Card' },
     { value: 'other', label: 'Other' },
 ];
+
+/** Sentinel for "somebody else paid this" in the payment form's source select. */
+const EXTERNAL_PAYER = 'external';
 
 export default function Accounts({ data, setData, baseCurrency, onCurrencyChange }: AccountsProps) {
     const [viewMode, setViewMode] = useState<'accounts' | 'automations'>('accounts');
@@ -44,6 +50,8 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         type: 'checking' as AccountType,
         currency: 'USD' as Currency,
         balance: '',
+        statementDay: DEFAULT_STATEMENT_DAY,
+        paymentDueDate: '',
     });
 
     const [transferForm, setTransferForm] = useState({
@@ -52,10 +60,37 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         amount: '',
     });
 
+    const [payingCardId, setPayingCardId] = useState<string | null>(null);
+    const [paymentForm, setPaymentForm] = useState({
+        amount: '',
+        sourceAccountId: '',
+        recordAsIncome: true,
+    });
+
+    const emptyAddForm = {
+        name: '',
+        type: 'checking' as AccountType,
+        currency: 'USD' as Currency,
+        balance: '',
+        statementDay: DEFAULT_STATEMENT_DAY,
+        paymentDueDate: '',
+    };
+
     const accounts = data.accounts || [];
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+
+        const isCredit = addForm.type === 'credit';
+        const entered = parseAmount(addForm.balance) ?? 0;
+        // A card is entered as "what I owe" (a positive number) but stored as a
+        // negative balance, so net worth and transfers need no special casing.
+        const balance = isCredit ? -Math.abs(entered) : entered;
+        // Spread in conditionally: Firestore rejects `undefined`, and non-credit
+        // accounts have no business carrying statement fields.
+        const creditFields = isCredit
+            ? { statementDay: addForm.statementDay, paymentDueDate: addForm.paymentDueDate }
+            : {};
 
         if (editingAccountId) {
             const updatedAccounts = accounts.map(acc =>
@@ -65,7 +100,8 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                         name: addForm.name,
                         type: addForm.type,
                         currency: addForm.currency,
-                        balance: parseAmount(addForm.balance) ?? 0,
+                        balance,
+                        ...creditFields,
                     }
                     : acc
             );
@@ -80,7 +116,8 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                 name: addForm.name,
                 type: addForm.type,
                 currency: addForm.currency,
-                balance: parseAmount(addForm.balance) ?? 0,
+                balance,
+                ...creditFields,
             };
 
             setData({
@@ -89,13 +126,86 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             });
         }
 
-        setAddForm({
-            name: '',
-            type: 'checking',
-            currency: 'USD',
-            balance: '',
-        });
+        setAddForm(emptyAddForm);
         setShowAddForm(false);
+    };
+
+    /**
+     * Pay down a card. The amount is expressed in the card's currency (what
+     * actually comes off the debt); a source account in another currency is
+     * debited the converted equivalent. Choosing EXTERNAL_PAYER means someone
+     * else paid — the debt drops and none of our accounts move, which is a real
+     * increase in net worth, so it can optionally be booked as income too.
+     */
+    const handleCardPayment = (e: React.FormEvent) => {
+        e.preventDefault();
+
+        const card = accounts.find(a => a.id === payingCardId);
+        if (!card) return;
+
+        const amount = parseAmount(paymentForm.amount);
+        if (amount === null || amount <= 0) {
+            alert('Please enter a valid amount greater than 0.');
+            return;
+        }
+
+        const isExternal = paymentForm.sourceAccountId === EXTERNAL_PAYER;
+        const source = isExternal ? null : accounts.find(a => a.id === paymentForm.sourceAccountId);
+        if (!isExternal && !source) {
+            alert('Please choose where the payment comes from.');
+            return;
+        }
+
+        const newAccounts = accounts.map(acc => {
+            if (acc.id === card.id) {
+                // Debt is negative, so paying moves the balance up towards zero.
+                return { ...acc, balance: acc.balance + amount };
+            }
+            if (source && acc.id === source.id) {
+                return { ...acc, balance: acc.balance - convertCurrency(amount, card.currency, acc.currency) };
+            }
+            return acc;
+        });
+
+        const log: ActivityLog = {
+            id: Date.now().toString(),
+            date: new Date().toISOString(),
+            description: isExternal
+                ? `Card payment (paid externally): ${card.name}`
+                : `Card payment: ${source!.name} to ${card.name}`,
+            amount,
+            currency: card.currency,
+            destinationAccountId: card.id,
+            type: 'cardPayment',
+        };
+        if (source) log.sourceAccountId = source.id;
+
+        const newData: AppData = {
+            ...data,
+            accounts: newAccounts,
+            activityLogs: [...(data.activityLogs || []), log],
+        };
+
+        if (isExternal && paymentForm.recordAsIncome) {
+            const today = new Date();
+            const income: Income = {
+                id: Date.now().toString() + '-income',
+                amount,
+                currency: card.currency,
+                description: `Card payment by someone else: ${card.name}`,
+                category: 'Other',
+                date: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`,
+                // Booked against the card because that's where the money landed;
+                // the balance change above is the only one — this record is for
+                // reporting, it doesn't move a balance a second time.
+                accountId: card.id,
+            };
+            newData.incomes = [...data.incomes, income];
+        }
+
+        setData(newData);
+        setPaymentForm({ amount: '', sourceAccountId: '', recordAsIncome: true });
+        setPayingCardId(null);
     };
 
     const handleTransferSubmit = (e: React.FormEvent) => {
@@ -185,7 +295,10 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             name: account.name,
             type: account.type,
             currency: account.currency,
-            balance: account.balance.toString(),
+            // Cards are edited as the positive amount owed, matching how they're added.
+            balance: (account.type === 'credit' ? Math.abs(account.balance) : account.balance).toString(),
+            statementDay: account.statementDay ?? DEFAULT_STATEMENT_DAY,
+            paymentDueDate: account.paymentDueDate || '',
         });
         setShowAddForm(true);
         setShowTransferForm(false);
@@ -531,7 +644,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                 <button
                     onClick={() => {
                         setEditingAccountId(null);
-                        setAddForm({ name: '', type: 'checking', currency: 'USD', balance: '' });
+                        setAddForm(emptyAddForm);
                         setShowAddForm(true);
                         setShowTransferForm(false);
                     }}
@@ -586,7 +699,9 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                             </div>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Initial Balance</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                {addForm.type === 'credit' ? 'Amount Currently Owed' : 'Initial Balance'}
+                            </label>
                             <input
                                 type="text"
                                 inputMode="decimal"
@@ -602,7 +717,38 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                 placeholder="0.00"
                             />
+                            {addForm.type === 'credit' && (
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Enter your debt as a positive number. It counts against your net worth.
+                                </p>
+                            )}
                         </div>
+                        {addForm.type === 'credit' && (
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Statement Closes On</label>
+                                    <select
+                                        value={addForm.statementDay}
+                                        onChange={(e) => setAddForm({ ...addForm, statementDay: parseInt(e.target.value) })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    >
+                                        {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                                            <option key={d} value={d}>Day {d}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Due</label>
+                                    <input
+                                        type="date"
+                                        value={addForm.paymentDueDate}
+                                        onChange={(e) => setAddForm({ ...addForm, paymentDueDate: e.target.value })}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    />
+                                    <p className="mt-1 text-xs text-gray-500">Update each cycle — issuers shift this date.</p>
+                                </div>
+                            </div>
+                        )}
                         <div className="flex gap-2">
                             <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
                                 {editingAccountId ? 'Update Account' : 'Save Account'}
@@ -682,16 +828,31 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
 
             {/* Account List */}
             <div className="space-y-4">
-                {accounts.map(account => (
+                {accounts.map(account => {
+                    const isCredit = account.type === 'credit';
+                    const statement = isCredit
+                        ? getCardStatement(data.expenses, account.id, account.statementDay ?? DEFAULT_STATEMENT_DAY, new Date())
+                        : null;
+                    // Payments made after the cutoff are paying off the statement
+                    // that closed on it, so they net against the billed total.
+                    const billed = statement ? sumInCurrency(statement.billed, account.currency) : 0;
+                    const paid = statement ? sumCardPayments(data.activityLogs, account.id, statement.currentStart, account.currency) : 0;
+                    const running = statement ? sumInCurrency(statement.current, account.currency) : 0;
+
+                    return (
                     <div key={account.id} className="bg-white rounded-lg shadow p-4">
                         <div className="flex justify-between items-start mb-2">
                             <div className="flex items-center gap-2">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                    {account.type === 'checking' || account.type === 'savings' ? <Building2 size={20} /> : <Wallet size={20} />}
+                                <div className={`p-2 rounded-lg ${isCredit ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    {isCredit
+                                        ? <CreditCard size={20} />
+                                        : account.type === 'checking' || account.type === 'savings' ? <Building2 size={20} /> : <Wallet size={20} />}
                                 </div>
                                 <div>
                                     <h3 className="font-semibold text-gray-800">{account.name}</h3>
-                                    <div className="text-sm text-gray-500 capitalize">{account.type}</div>
+                                    <div className="text-sm text-gray-500">
+                                        {accountTypes.find(t => t.value === account.type)?.label || account.type}
+                                    </div>
                                 </div>
                             </div>
                             <div className="flex gap-2">
@@ -710,17 +871,146 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                             </div>
                         </div>
                         <div className="mt-4">
-                            <div className="text-2xl font-bold text-gray-900">
-                                {formatCurrency(account.balance, account.currency)}
-                            </div>
+                            {isCredit ? (
+                                <>
+                                    <div className="text-sm text-gray-500">Total owed</div>
+                                    <div className="text-2xl font-bold text-red-600">
+                                        {formatCurrency(Math.max(0, -account.balance), account.currency)}
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="text-2xl font-bold text-gray-900">
+                                    {formatCurrency(account.balance, account.currency)}
+                                </div>
+                            )}
                             {account.currency !== baseCurrency && (
                                 <div className="text-sm text-gray-500">
                                     ≈ {formatCurrency(convertCurrency(account.balance, account.currency, baseCurrency), baseCurrency)}
                                 </div>
                             )}
                         </div>
+
+                        {isCredit && statement && (
+                            <div className="mt-4 space-y-3">
+                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                    <div className="flex justify-between text-sm">
+                                        <span className="text-gray-600">
+                                            Statement closed {formatDateForDisplay(statement.lastCutoff)}
+                                        </span>
+                                        <span className="font-medium text-gray-800">{formatCurrency(billed, account.currency)}</span>
+                                    </div>
+                                    {paid > 0 && (
+                                        <>
+                                            <div className="flex justify-between text-sm mt-1">
+                                                <span className="text-gray-600">Paid since then</span>
+                                                <span className="font-medium text-green-600">−{formatCurrency(paid, account.currency)}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-gray-200">
+                                                <span className="text-gray-700 font-medium">Left on this statement</span>
+                                                <span className="font-semibold text-gray-900">
+                                                    {formatCurrency(Math.max(0, billed - paid), account.currency)}
+                                                </span>
+                                            </div>
+                                        </>
+                                    )}
+                                    <div className="flex justify-between text-sm mt-2 pt-2 border-t border-gray-200">
+                                        <span className="text-gray-600">
+                                            Current cycle (since {formatDateForDisplay(statement.currentStart)})
+                                        </span>
+                                        <span className="font-medium text-gray-800">{formatCurrency(running, account.currency)}</span>
+                                    </div>
+                                    <div className="mt-2 text-xs text-gray-500">
+                                        {account.paymentDueDate
+                                            ? `Due ${formatDateForDisplay(account.paymentDueDate)}`
+                                            : 'No due date set — edit the account to add it.'}
+                                    </div>
+                                </div>
+
+                                {payingCardId === account.id ? (
+                                    <form onSubmit={handleCardPayment} className="p-3 bg-white border border-gray-200 rounded-lg space-y-3">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                                Amount ({account.currency})
+                                            </label>
+                                            <input
+                                                type="text"
+                                                inputMode="decimal"
+                                                lang="en-US"
+                                                required
+                                                autoFocus
+                                                value={paymentForm.amount}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(',', '.');
+                                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                                        setPaymentForm({ ...paymentForm, amount: val });
+                                                    }
+                                                }}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Paid from</label>
+                                            <select
+                                                required
+                                                value={paymentForm.sourceAccountId}
+                                                onChange={(e) => setPaymentForm({ ...paymentForm, sourceAccountId: e.target.value })}
+                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            >
+                                                <option value="">Select source...</option>
+                                                {accounts.filter(a => a.type !== 'credit').map(a => (
+                                                    <option key={a.id} value={a.id}>
+                                                        {a.name} ({formatCurrency(a.balance, a.currency)})
+                                                    </option>
+                                                ))}
+                                                <option value={EXTERNAL_PAYER}>Someone else paid</option>
+                                            </select>
+                                        </div>
+                                        {paymentForm.sourceAccountId === EXTERNAL_PAYER && (
+                                            <label className="flex items-start gap-2 text-sm text-gray-700">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={paymentForm.recordAsIncome}
+                                                    onChange={(e) => setPaymentForm({ ...paymentForm, recordAsIncome: e.target.checked })}
+                                                    className="mt-0.5"
+                                                />
+                                                <span>
+                                                    Record as income
+                                                    <span className="block text-xs text-gray-500">
+                                                        Your net worth goes up when someone else pays. Logging it keeps that visible.
+                                                    </span>
+                                                </span>
+                                            </label>
+                                        )}
+                                        <div className="flex gap-2">
+                                            <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold">
+                                                Record Payment
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPayingCardId(null)}
+                                                className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold"
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </form>
+                                ) : (
+                                    <button
+                                        onClick={() => {
+                                            setPaymentForm({ amount: '', sourceAccountId: '', recordAsIncome: true });
+                                            setPayingCardId(account.id);
+                                        }}
+                                        className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold"
+                                    >
+                                        Pay Card
+                                    </button>
+                                )}
+                            </div>
+                        )}
                     </div>
-                ))}
+                    );
+                })}
                 {accounts.length === 0 && (
                     <div className="text-center py-8 text-gray-500">
                         No accounts added yet.
