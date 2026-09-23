@@ -21,6 +21,23 @@ export interface Account {
    * from `statementDay`.
    */
   paymentDueDate?: string;
+  /**
+   * How automatic capture recognises this account: last four digits from bank
+   * SMS (card or account number) and card names as shown in Apple Wallet.
+   */
+  matchKeys?: string[];
+}
+
+/**
+ * Set on expenses created from an Apple Pay capture so the bank SMS for the
+ * same purchase can be paired with it (one SMS per expense) and dropped.
+ */
+export interface CaptureInfo {
+  via: 'applepay';
+  /** ISO timestamp of the tap. */
+  at: string;
+  /** Inbox item id of the SMS that was paired with this expense. */
+  pairedItemId?: string;
 }
 
 export interface Expense {
@@ -31,6 +48,7 @@ export interface Expense {
   category: string;
   date: string;
   accountId: string;
+  capture?: CaptureInfo;
 }
 
 export interface Income {
@@ -157,6 +175,8 @@ export interface AppData {
   settings?: {
     autoUpdatePrices: boolean;
     dashboardLayout?: DashboardWidgetConfig[];
+    /** Secret id of `inboxes/{key}`, where the iPhone shortcuts drop captures. */
+    inboxKey?: string;
   };
 }
 

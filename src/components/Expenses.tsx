@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome, calculateCategoryBreakdown } from '../utils/calculations';
+import { expenseCategories, incomeCategories } from '../utils/categories';
 import { formatDateForDisplay } from '../utils/date';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
@@ -16,8 +17,6 @@ interface ExpensesProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-const expenseCategories = ['Food', 'Transport', 'Shopping', 'Bills', 'Entertainment', 'Healthcare', 'Other'];
-const incomeCategories = ['Salary', 'Freelance', 'Investment', 'Business', 'Rental', 'Other'];
 type ViewMode = 'expenses' | 'income' | 'recurring';
 type ExpensePeriod = 'all' | 'month' | 'fortnight';
 

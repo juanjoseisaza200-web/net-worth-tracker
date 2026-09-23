@@ -12,6 +12,30 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Automatic capture. The inbox key is a random 64-char secret stored in the
+    // user's settings; the doc at inboxes/{key} records which user owns it.
+    // iPhone shortcuts (unauthenticated, via the REST API) may only APPEND
+    // items to an existing inbox — never read, list, update or delete. Only
+    // the signed-in owner can read and clear them.
+    match /inboxes/{key} {
+      allow create: if request.auth != null
+        && key.size() == 64
+        && request.resource.data.keys().hasOnly(['uid'])
+        && request.resource.data.uid == request.auth.uid;
+      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+
+      match /items/{itemId} {
+        allow create: if exists(/databases/$(database)/documents/inboxes/$(key))
+          && request.resource.data.keys().hasOnly(['source', 'text', 'amount', 'merchant', 'card', 'category', 'description', 'at'])
+          && request.resource.data.source in ['applepay', 'sms']
+          && (!('text' in request.resource.data) || (request.resource.data.text is string && request.resource.data.text.size() <= 1000))
+          && (!('merchant' in request.resource.data) || (request.resource.data.merchant is string && request.resource.data.merchant.size() <= 200))
+          && (!('description' in request.resource.data) || (request.resource.data.description is string && request.resource.data.description.size() <= 200));
+        allow read, delete: if request.auth != null
+          && get(/databases/$(database)/documents/inboxes/$(key)).data.uid == request.auth.uid;
+      }
+    }
+
     // Deny everything else by default.
     match /{document=**} {
       allow read, write: if false;

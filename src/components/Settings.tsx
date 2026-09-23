@@ -1,10 +1,11 @@
 import { User } from 'firebase/auth';
-import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff, Download, Upload } from 'lucide-react';
+import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff, Download, Upload, Smartphone, Copy } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { AppData } from '../types';
 import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
-import { migrateData } from '../utils/storage';
+import { migrateData, generateInboxKey, registerInboxKey, unregisterInboxKey } from '../utils/storage';
+import { db } from '../firebase';
 
 interface SettingsProps {
     user: User;
@@ -56,6 +57,43 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
         } finally {
             // Reset so selecting the same file again still fires onChange.
             if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
+    const inboxKey = data.settings?.inboxKey;
+    const [captureBusy, setCaptureBusy] = useState(false);
+    const [copied, setCopied] = useState(false);
+    // Where the iPhone shortcuts POST: Firestore's REST API, authorised only by
+    // the secret key in the path (see the inboxes rules in firestore.rules).
+    const { projectId, apiKey } = db.app.options;
+    const captureUrl = inboxKey
+        ? `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/inboxes/${inboxKey}/items?key=${apiKey}`
+        : '';
+
+    const handleEnableCapture = async () => {
+        if (inboxKey && !window.confirm('Generate a new key? The shortcuts on your iPhone will stop working until you paste the new URL into them.')) return;
+        setCaptureBusy(true);
+        try {
+            const key = generateInboxKey();
+            await registerInboxKey(key, user.uid);
+            await setData({ ...data, settings: { ...data.settings, autoUpdatePrices, inboxKey: key } });
+            // Best effort: an orphaned old inbox doc is harmless, it just keeps accepting writes nobody reads.
+            if (inboxKey) await unregisterInboxKey(inboxKey).catch(err => console.warn('Could not remove old inbox key', err));
+        } catch (err: any) {
+            console.error('Failed to enable automatic capture', err);
+            alert('Could not enable automatic capture: ' + (err.message || 'unknown error'));
+        } finally {
+            setCaptureBusy(false);
+        }
+    };
+
+    const handleCopyUrl = async () => {
+        try {
+            await navigator.clipboard.writeText(captureUrl);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch {
+            window.prompt('Copy this URL:', captureUrl);
         }
     };
 
@@ -212,6 +250,55 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                             <span className="font-medium">Sign Out</span>
                         </div>
                     </button>
+                </div>
+
+                {/* Automatic capture (iPhone shortcuts -> review queue) */}
+                <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
+                    <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${inboxKey ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                            <Smartphone size={20} />
+                        </div>
+                        <div>
+                            <span className="block font-medium text-gray-900">Automatic Capture</span>
+                            <span className="block text-xs text-gray-500">Apple Pay taps and Bancolombia SMS via iPhone Shortcuts</span>
+                        </div>
+                    </div>
+                    {inboxKey ? (
+                        <>
+                            <p className="text-xs text-gray-500">
+                                Shortcut URL. Anyone with it can add transactions to your review queue (never read your data) — keep it private.
+                            </p>
+                            <div className="flex gap-2">
+                                <input
+                                    readOnly
+                                    value={captureUrl}
+                                    onFocus={(e) => e.target.select()}
+                                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono bg-gray-50"
+                                />
+                                <button
+                                    onClick={handleCopyUrl}
+                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1"
+                                >
+                                    <Copy size={14} /> {copied ? 'Copied' : 'Copy'}
+                                </button>
+                            </div>
+                            <button
+                                onClick={handleEnableCapture}
+                                disabled={captureBusy}
+                                className="text-xs text-red-600 underline disabled:opacity-50"
+                            >
+                                Generate a new key
+                            </button>
+                        </>
+                    ) : (
+                        <button
+                            onClick={handleEnableCapture}
+                            disabled={captureBusy}
+                            className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
+                        >
+                            {captureBusy ? 'Enabling…' : 'Enable automatic capture'}
+                        </button>
+                    )}
                 </div>
 
                 <div className="text-center text-xs text-gray-400 mt-8">

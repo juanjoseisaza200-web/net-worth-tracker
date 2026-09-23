@@ -52,6 +52,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         balance: '',
         statementDay: DEFAULT_STATEMENT_DAY,
         paymentDueDate: '',
+        matchKeys: '',
     });
 
     const [transferForm, setTransferForm] = useState({
@@ -74,6 +75,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         balance: '',
         statementDay: DEFAULT_STATEMENT_DAY,
         paymentDueDate: '',
+        matchKeys: '',
     };
 
     const accounts = data.accounts || [];
@@ -91,6 +93,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         const creditFields = isCredit
             ? { statementDay: addForm.statementDay, paymentDueDate: addForm.paymentDueDate }
             : {};
+        const matchKeys = addForm.matchKeys.split(',').map(k => k.trim()).filter(Boolean);
 
         if (editingAccountId) {
             const updatedAccounts = accounts.map(acc =>
@@ -102,6 +105,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                         currency: addForm.currency,
                         balance,
                         ...creditFields,
+                        matchKeys,
                     }
                     : acc
             );
@@ -118,6 +122,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                 currency: addForm.currency,
                 balance,
                 ...creditFields,
+                matchKeys,
             };
 
             setData({
@@ -299,6 +304,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             balance: (account.type === 'credit' ? Math.abs(account.balance) : account.balance).toString(),
             statementDay: account.statementDay ?? DEFAULT_STATEMENT_DAY,
             paymentDueDate: account.paymentDueDate || '',
+            matchKeys: (account.matchKeys || []).join(', '),
         });
         setShowAddForm(true);
         setShowTransferForm(false);
@@ -749,6 +755,19 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                 </div>
                             </div>
                         )}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Auto-capture identifiers</label>
+                            <input
+                                type="text"
+                                value={addForm.matchKeys}
+                                onChange={(e) => setAddForm({ ...addForm, matchKeys: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="e.g. 1342, Black Mastercard"
+                            />
+                            <p className="mt-1 text-xs text-gray-500">
+                                Comma-separated: last 4 digits from bank SMS (card and account) and the card name in Apple Wallet.
+                            </p>
+                        </div>
                         <div className="flex gap-2">
                             <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
                                 {editingAccountId ? 'Update Account' : 'Save Account'}

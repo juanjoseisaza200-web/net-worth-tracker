@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, TrendingUp, DollarSign, Building2, Users } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Building2, Users, Inbox } from 'lucide-react';
 import { AppData, Currency } from './types';
-import { loadData, saveData, subscribeToData, saveDataToCloud } from './utils/storage';
+import { loadData, saveData, subscribeToData, saveDataToCloud, subscribeToInbox, deleteInboxItem } from './utils/storage';
 import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
@@ -10,6 +10,7 @@ import Header from './components/Header';
 import { fetchExchangeRates } from './utils/currency';
 import { recordNetWorthSnapshot } from './utils/calculations';
 import { accrueFixedIncome } from './utils/fixedIncome';
+import { processInbox, applyEntry, InboxItem, PendingEntry } from './utils/inbox';
 
 // Route screens are code-split so the initial bundle stays small; each loads on
 // first navigation to that tab.
@@ -19,6 +20,7 @@ const Expenses = lazy(() => import('./components/Expenses'));
 const Investments = lazy(() => import('./components/Investments'));
 const Debts = lazy(() => import('./components/Debts'));
 const Settings = lazy(() => import('./components/Settings'));
+const Review = lazy(() => import('./components/Review'));
 
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
@@ -42,6 +44,10 @@ function App() {
   // Holds the active Firestore snapshot unsubscribe so it can be torn down
   // before re-subscribing or on unmount (prevents stacked listeners).
   const dataUnsubRef = useRef<(() => void) | null>(null);
+  // Automatic-capture items waiting in Firestore, and the ids whose delete is
+  // already in flight (so a re-render doesn't fire it again).
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const deletingInboxIds = useRef(new Set<string>());
 
   useEffect(() => {
     // Fetch live exchange rates on boot
@@ -127,6 +133,56 @@ function App() {
       unsubscribePromise.then(unsub => unsub());
     };
   }, []); // Only run on mount, but depends on load functions
+
+  const inboxKey = data.settings?.inboxKey;
+
+  useEffect(() => {
+    if (!user || !isCloudSynced || !inboxKey) {
+      setInboxItems([]);
+      return;
+    }
+    return subscribeToInbox(inboxKey, setInboxItems);
+  }, [user, isCloudSynced, inboxKey]);
+
+  const inbox = useMemo(() => processInbox(data, inboxItems), [data, inboxItems]);
+
+  // Book categorised Apple Pay captures and drop paired/unreadable SMS as soon
+  // as they arrive. The data is saved BEFORE the items are deleted: if the save
+  // fails the items stay and are retried; if the delete fails, re-processing is
+  // a no-op because booked records carry the item's id.
+  useEffect(() => {
+    if (!user || !isCloudSynced || !inboxKey) return;
+    const { data: next, deleteIds } = inbox;
+    const fresh = deleteIds.filter(id => !deletingInboxIds.current.has(id));
+    if (next === data && fresh.length === 0) return;
+    fresh.forEach(id => deletingInboxIds.current.add(id));
+    (async () => {
+      try {
+        if (next !== data) {
+          const toSave = recordNetWorthSnapshot(next);
+          setData(toSave);
+          saveData(toSave);
+          await saveDataToCloud(user.uid, toSave);
+        }
+        await Promise.all(fresh.map(id => deleteInboxItem(inboxKey, id)));
+      } catch (e) {
+        console.error('Failed to process captured transactions', e);
+        fresh.forEach(id => deletingInboxIds.current.delete(id));
+      }
+    })();
+  }, [inbox, data, user, isCloudSynced, inboxKey]);
+
+  /** Review queue: book the entry (or just discard it when null), then clear the item. */
+  const resolvePending = async (itemId: string, entry: PendingEntry | null) => {
+    if (!user || !isCloudSynced || !inboxKey) return;
+    if (entry) {
+      const toSave = recordNetWorthSnapshot(applyEntry(data, entry));
+      setData(toSave);
+      saveData(toSave);
+      await saveDataToCloud(user.uid, toSave);
+    }
+    await deleteInboxItem(inboxKey, itemId);
+  };
 
   // User Actions -> Cloud Save
   const handleCloudSave = async (newData: AppData) => {
@@ -257,6 +313,7 @@ function App() {
         </div>
 
         <main className="pb-24 max-w-md mx-auto relative">
+          <ReviewBanner count={inbox.pending.length} />
           <Suspense fallback={
             <div className="flex justify-center items-center py-20">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -268,6 +325,7 @@ function App() {
             <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={viewCurrencies.investments} onCurrencyChange={(c) => handleViewCurrencyChange('investments', c)} />} />
             <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.accounts} onCurrencyChange={(c) => handleViewCurrencyChange('accounts', c)} />} />
             <Route path="/debts" element={<Debts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.debts} onCurrencyChange={(c) => handleViewCurrencyChange('debts', c)} />} />
+            <Route path="/review" element={<Review data={data} pending={inbox.pending} onResolve={resolvePending} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>
           </Suspense>
@@ -275,6 +333,23 @@ function App() {
         <Navigation />
       </div>
     </Router>
+  );
+}
+
+function ReviewBanner({ count }: { count: number }) {
+  const location = useLocation();
+  if (count === 0 || location.pathname === '/review') return null;
+  return (
+    <Link
+      to="/review"
+      className="mx-4 mt-4 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm font-medium"
+    >
+      <span className="flex items-center gap-2">
+        <Inbox size={18} />
+        {count} captured {count === 1 ? 'transaction' : 'transactions'} to review
+      </span>
+      <span aria-hidden>→</span>
+    </Link>
   );
 }
 

@@ -77,7 +77,8 @@ export const migrateData = (data: any): AppData => {
   return data as AppData;
 };
 
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
+import type { InboxItem } from './inbox';
 import { db } from '../firebase';
 
 export const loadData = (): AppData => {
@@ -137,6 +138,33 @@ export const subscribeToData = (userId: string, onDataChange: (data: AppData) =>
     console.error("Error subscribing to data:", error);
   });
   return unsubscribe;
+};
+
+// --- Automatic capture inbox -------------------------------------------------
+// `inboxes/{key}` records which user owns the key; the shortcuts append to
+// `inboxes/{key}/items` through the Firestore REST API. See firestore.rules.
+
+/** 64 hex chars: long enough that the key itself is the credential. */
+export const generateInboxKey = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(32)), b => b.toString(16).padStart(2, '0')).join('');
+
+export const registerInboxKey = async (key: string, userId: string): Promise<void> => {
+  await setDoc(doc(db, 'inboxes', key), { uid: userId });
+};
+
+export const unregisterInboxKey = async (key: string): Promise<void> => {
+  await deleteDoc(doc(db, 'inboxes', key));
+};
+
+export const subscribeToInbox = (key: string, onItems: (items: InboxItem[]) => void): () => void =>
+  onSnapshot(collection(db, 'inboxes', key, 'items'), (snap) => {
+    onItems(snap.docs.map(d => ({ ...(d.data() as Omit<InboxItem, 'id'>), id: d.id })));
+  }, (error) => {
+    console.error('Error subscribing to inbox:', error);
+  });
+
+export const deleteInboxItem = async (key: string, itemId: string): Promise<void> => {
+  await deleteDoc(doc(db, 'inboxes', key, 'items', itemId));
 };
 
 export const updateBaseCurrency = (currency: Currency): void => {
