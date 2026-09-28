@@ -79,6 +79,7 @@ export const migrateData = (data: any): AppData => {
 
 import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
 import type { InboxItem } from './inbox';
+import { classifySnapshot, SnapshotKind } from './sync';
 import { db } from '../firebase';
 
 export const loadData = (): AppData => {
@@ -126,14 +127,27 @@ export const saveDataToCloud = async (userId: string, data: AppData): Promise<vo
   }
 };
 
-export const subscribeToData = (userId: string, onDataChange: (data: AppData) => void): () => void => {
+export interface SnapshotInfo {
+  /** 'cached' = possibly stale local copy; 'server' = confirmed by the server. */
+  kind: Exclude<SnapshotKind, 'wait'>;
+  /** Server data with no local writes still pending: what is really saved. */
+  confirmed: boolean;
+}
+
+export const subscribeToData = (userId: string, onDataChange: (data: AppData, info: SnapshotInfo) => void): () => void => {
   const docRef = doc(db, "users", userId);
-  const unsubscribe = onSnapshot(docRef, (docSnap) => {
-    // For a brand-new user (or a deleted doc) the snapshot won't exist yet.
-    // Still deliver a fresh default AppData so the app finishes loading and the
-    // first save creates the doc — otherwise it hangs on the loading spinner.
+  // includeMetadataChanges: with the persistent cache the first snapshot comes
+  // from IndexedDB, and if the server then has identical data no new snapshot
+  // would fire — the app could never tell that it is in sync.
+  const unsubscribe = onSnapshot(docRef, { includeMetadataChanges: true }, (docSnap) => {
+    const kind = classifySnapshot({ exists: docSnap.exists(), fromCache: docSnap.metadata.fromCache });
+    // No cached document says nothing about the server; keep loading instead
+    // of showing a brand-new (empty) user whose first save would wipe the doc.
+    if (kind === 'wait') return;
+    // A missing doc confirmed by the server is a brand-new user: deliver fresh
+    // defaults so the app finishes loading and the first save creates the doc.
     const data = docSnap.exists() ? docSnap.data() : {};
-    onDataChange(migrateData(data));
+    onDataChange(migrateData(data), { kind, confirmed: kind === 'server' && !docSnap.metadata.hasPendingWrites });
   }, (error) => {
     console.error("Error subscribing to data:", error);
   });

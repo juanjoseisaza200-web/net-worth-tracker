@@ -23,6 +23,10 @@ export const auth = getAuth(app);
 // reads work offline and writes made offline are queued and flushed on
 // reconnect (the app's localStorage mirror is only a last-state snapshot, not a
 // write queue). Must be configured here, before any other Firestore access.
+// ignoreUndefinedProperties: AppData is saved as one document, and a single
+// optional field left `undefined` anywhere (e.g. a recurring income that never
+// ran has no lastRunMonth) would otherwise make setDoc reject every save.
 export const db = initializeFirestore(app, {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    ignoreUndefinedProperties: true,
 });

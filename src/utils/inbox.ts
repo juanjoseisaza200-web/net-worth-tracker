@@ -92,6 +92,17 @@ const withBalance = (accounts: Account[], accountId: string, delta: number, curr
     ? { ...a, balance: a.balance + convertCurrency(delta, currency, a.currency) }
     : a));
 
+/**
+ * True if `data` holds the effect of an inbox item: its booked expense/income,
+ * or an expense paired with it. Used to delete an item from the inbox only
+ * once that effect is confirmed saved on the server.
+ */
+export const isRecordedIn = (data: AppData, itemId: string): boolean => {
+  const id = `inbox-${itemId}`;
+  return data.expenses.some(e => e.id === id || e.capture?.pairedItemId === itemId)
+    || data.incomes.some(i => i.id === id);
+};
+
 /** Book a reviewed entry as an expense or income. No-op if already booked. */
 export const applyEntry = (data: AppData, entry: PendingEntry): AppData => {
   const id = `inbox-${entry.itemId}`;

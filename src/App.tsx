@@ -10,7 +10,7 @@ import Header from './components/Header';
 import { fetchExchangeRates } from './utils/currency';
 import { recordNetWorthSnapshot } from './utils/calculations';
 import { accrueFixedIncome } from './utils/fixedIncome';
-import { processInbox, applyEntry, InboxItem, PendingEntry } from './utils/inbox';
+import { processInbox, applyEntry, isRecordedIn, InboxItem, PendingEntry } from './utils/inbox';
 
 // Route screens are code-split so the initial bundle stays small; each loads on
 // first navigation to that tab.
@@ -48,6 +48,9 @@ function App() {
   // already in flight (so a re-render doesn't fire it again).
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
   const deletingInboxIds = useRef(new Set<string>());
+  // Last snapshot the server confirmed with no local writes pending: what is
+  // really saved. Inbox items are only deleted once their effect is in here.
+  const confirmedDataRef = useRef<AppData | null>(null);
 
   useEffect(() => {
     // Fetch live exchange rates on boot
@@ -78,33 +81,43 @@ function App() {
           if (currentUser) {
             // Subscribe to real-time cloud data
             console.log("Subscribing to cloud data...");
-            dataUnsubRef.current = subscribeToData(currentUser.uid, async (cloudData) => {
-              if (mounted) {
-                console.log("Cloud data updated", cloudData);
-                // Side effects of loading data: accrue daily fixed-income interest,
-                // then run scheduled automations / recurring incomes. Both return the
-                // same reference when nothing changes, so `newData !== cloudData`
-                // tells us whether we need to persist an update.
-                const accrued = accrueFixedIncome(cloudData);
-                const { newData, messages } = (await import('./utils/automations')).processAutomations(accrued);
-                const changed = newData !== cloudData;
+            dataUnsubRef.current = subscribeToData(currentUser.uid, async (cloudData, { kind, confirmed }) => {
+              if (!mounted) return;
+              console.log("Cloud data updated", kind, cloudData);
+              if (confirmed) confirmedDataRef.current = cloudData;
 
-                if (changed) {
-                  try {
-                    await saveDataToCloud(currentUser.uid, newData);
-                    if (messages.length > 0) {
-                      alert("Automations Ran automatically:\n" + messages.join("\n"));
-                    }
-                  } catch (e) {
-                    console.error("Failed to save data updates", e);
-                  }
-                }
-
-                // Always reflect the latest data locally and finish loading.
-                setData(newData);
-                saveData(newData); // keep localStorage fresh for next boot
-                setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
+              if (kind === 'cached') {
+                // Possibly stale local copy (e.g. this device's cache from
+                // yesterday). Show it while the server answers, but don't
+                // accrue/automate on it and keep cloud saves locked: saving it
+                // would overwrite whatever other devices saved since.
+                setData(cloudData);
                 setLoading(false);
+                return;
+              }
+
+              // Server data. Side effects of loading: accrue daily fixed-income
+              // interest, then run scheduled automations / recurring incomes.
+              // Both return the same reference when nothing changes.
+              const accrued = accrueFixedIncome(cloudData);
+              const { newData, messages } = (await import('./utils/automations')).processAutomations(accrued);
+
+              // Reflect the data BEFORE the save round-trip: setting it after
+              // the await would revert anything newer that landed meanwhile.
+              setData(newData);
+              saveData(newData); // keep localStorage fresh for next boot
+              setIsCloudSynced(true); // Mark as synced - SAFE TO SAVE NOW
+              setLoading(false);
+
+              if (newData !== cloudData) {
+                try {
+                  await saveDataToCloud(currentUser.uid, newData);
+                  if (messages.length > 0) {
+                    alert("Automations Ran automatically:\n" + messages.join("\n"));
+                  }
+                } catch (e) {
+                  console.error("Failed to save data updates", e);
+                }
               }
             });
           } else {
@@ -147,13 +160,17 @@ function App() {
   const inbox = useMemo(() => processInbox(data, inboxItems), [data, inboxItems]);
 
   // Book categorised Apple Pay captures and drop paired/unreadable SMS as soon
-  // as they arrive. The data is saved BEFORE the items are deleted: if the save
-  // fails the items stay and are retried; if the delete fails, re-processing is
-  // a no-op because booked records carry the item's id.
+  // as they arrive. An item is deleted only once the server has confirmed the
+  // record it produced (isRecordedIn on confirmed data): a failed or pending
+  // save keeps the item, and re-processing it is a no-op because booked
+  // records carry the item's id. Items that leave no record (unreadable SMS)
+  // are deleted right away.
   useEffect(() => {
     if (!user || !isCloudSynced || !inboxKey) return;
     const { data: next, deleteIds } = inbox;
-    const fresh = deleteIds.filter(id => !deletingInboxIds.current.has(id));
+    const confirmedData = confirmedDataRef.current;
+    const fresh = deleteIds.filter(id => !deletingInboxIds.current.has(id)
+      && (!isRecordedIn(next, id) || (confirmedData !== null && isRecordedIn(confirmedData, id))));
     if (next === data && fresh.length === 0) return;
     fresh.forEach(id => deletingInboxIds.current.add(id));
     (async () => {
@@ -186,6 +203,17 @@ function App() {
 
   // User Actions -> Cloud Save
   const handleCloudSave = async (newData: AppData) => {
+    // CRITICAL SAFETY GUARD:
+    // Prevent overwriting cloud data before the server has confirmed what's
+    // saved (a stale tab or an out-of-date offline cache would wipe newer
+    // data). Refuse the change outright rather than showing it only on
+    // screen, where the next snapshot would silently replace it.
+    if (user && !isCloudSynced) {
+      console.warn("BLOCKED: Attempted to save to cloud before initial sync to prevent data loss.");
+      alert("Still syncing with the cloud, so this change was not saved. Try again in a moment.");
+      return;
+    }
+
     // Record today's net-worth snapshot as a side effect of every explicit save
     // (deduped per day) so the history/trend chart accumulates over time.
     const dataToSave = recordNetWorthSnapshot(newData);
@@ -195,15 +223,6 @@ function App() {
     saveData(dataToSave);
 
     if (user) {
-      // CRITICAL SAFETY GUARD:
-      // Prevent overwriting cloud data if we haven't successfully synced yet.
-      // This stops "Stale Tab" overwrites where an old open tab auto-saves its
-      // old state before downloading the new state, wiping your data.
-      if (!isCloudSynced) {
-        console.warn("BLOCKED: Attempted to save to cloud before initial sync to prevent data loss.");
-        return;
-      }
-
       try {
         setIsSaving(true);
         setSaveError(null);
@@ -235,6 +254,11 @@ function App() {
   };
 
   const handleManualSync = async () => {
+    // Same guard as handleCloudSave: never push a copy the server hasn't confirmed.
+    if (user && !isCloudSynced) {
+      alert("Still syncing with the cloud. Try again in a moment.");
+      return;
+    }
     if (user) {
       try {
         setIsSaving(true);

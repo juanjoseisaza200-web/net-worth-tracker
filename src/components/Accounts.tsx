@@ -3,6 +3,7 @@ import { Plus, Wallet, ArrowRightLeft, Trash2, CreditCard, Landmark, PiggyBank, 
 import { AppData, Account, AccountType, Currency, Automation, ActivityLog, Income } from '../types';
 import { formatCurrency, formatCurrencyTrimmed, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { parseAmount, groupThousands, ungroupTyped, toEditableAmount } from '../utils/number';
+import { resolveEditedBalance } from '../utils/sync';
 import { formatDateForDisplay, getOrdinalSuffix } from '../utils/date';
 import { DEFAULT_STATEMENT_DAY, getCardStatement, sumCardPayments, sumInCurrency } from '../utils/creditCard';
 import CurrencySelect from './CurrencySelect';
@@ -41,6 +42,8 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     const [showAddForm, setShowAddForm] = useState(false);
     const [showTransferForm, setShowTransferForm] = useState(false);
     const [editingAccountId, setEditingAccountId] = useState<string | null>(null);
+    // Balance field as it was when the edit form opened (see resolveEditedBalance).
+    const [balanceAtOpen, setBalanceAtOpen] = useState('');
 
     const [showAutomationForm, setShowAutomationForm] = useState(false);
     const [editingAutomationId, setEditingAutomationId] = useState<string | null>(null);
@@ -134,7 +137,14 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                         name: addForm.name,
                         type: addForm.type,
                         currency: addForm.currency,
-                        balance,
+                        // Untouched field keeps the CURRENT balance, not the one
+                        // captured when the form opened.
+                        balance: resolveEditedBalance({
+                            current: acc.balance,
+                            typed: addForm.balance,
+                            typedAtOpen: balanceAtOpen,
+                            isCredit,
+                        }),
                         ...creditFields,
                         matchKeys,
                     }
@@ -326,13 +336,15 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     };
 
     const handleEditAccount = (account: Account) => {
+        // Cards are edited as the positive amount owed, matching how they're added.
+        const balanceField = toEditableAmount(account.type === 'credit' ? Math.abs(account.balance) : account.balance);
         setEditingAccountId(account.id);
+        setBalanceAtOpen(balanceField);
         setAddForm({
             name: account.name,
             type: account.type,
             currency: account.currency,
-            // Cards are edited as the positive amount owed, matching how they're added.
-            balance: toEditableAmount(account.type === 'credit' ? Math.abs(account.balance) : account.balance),
+            balance: balanceField,
             statementDay: account.statementDay ?? DEFAULT_STATEMENT_DAY,
             paymentDueDate: account.paymentDueDate || '',
             matchKeys: (account.matchKeys || []).join(', '),

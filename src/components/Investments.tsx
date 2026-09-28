@@ -8,6 +8,7 @@ import { searchStockSymbols } from '../utils/stockSearch';
 import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
+import { applyPrices } from '../utils/sync';
 import CurrencySelect from './CurrencySelect';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
@@ -367,45 +368,27 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
   };
 
+  // Latest data, read when prices come back (see refreshPrices).
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
   // Reusable refresh logic
   const refreshPrices = async (isManual = false) => {
     if (data.stocks.length === 0 && data.crypto.length === 0) return;
 
     if (isManual) setIsRefreshing(true);
 
-    const updatedData = { ...data };
-    let hasUpdates = false;
-
     try {
-      // Fetch stock prices
-      if (data.stocks.length > 0) {
-        const stockSymbols = data.stocks.map(s => s.symbol);
-        const stockPrices = await fetchStockPrices(stockSymbols);
+      const stockPrices = data.stocks.length > 0 ? await fetchStockPrices(data.stocks.map(s => s.symbol)) : {};
+      const cryptoPrices = data.crypto.length > 0 ? await fetchCryptoPrices(data.crypto.map(c => c.symbol)) : {};
 
-        updatedData.stocks = data.stocks.map(stock => {
-          if (stockPrices[stock.symbol] && stockPrices[stock.symbol] !== stock.currentPrice) {
-            hasUpdates = true;
-            return { ...stock, currentPrice: stockPrices[stock.symbol] };
-          }
-          return stock;
-        });
-      }
+      // The fetches take seconds: apply the prices to the data as it is NOW,
+      // not to the copy from when they started — otherwise anything saved in
+      // the meantime (an expense, a capture, a new holding) would be reverted.
+      const latest = dataRef.current;
+      const updatedData = applyPrices(latest, stockPrices, cryptoPrices);
 
-      // Fetch crypto prices
-      if (data.crypto.length > 0) {
-        const cryptoSymbols = data.crypto.map(c => c.symbol);
-        const cryptoPrices = await fetchCryptoPrices(cryptoSymbols);
-
-        updatedData.crypto = data.crypto.map(crypto => {
-          if (cryptoPrices[crypto.symbol] && cryptoPrices[crypto.symbol] !== crypto.currentPrice) {
-            hasUpdates = true;
-            return { ...crypto, currentPrice: cryptoPrices[crypto.symbol] };
-          }
-          return crypto;
-        });
-      }
-
-      if (hasUpdates) {
+      if (updatedData !== latest) {
         // If manual refresh, save to cloud (setData). If auto, local only (saveLocalData).
         if (isManual) {
           setData(updatedData);

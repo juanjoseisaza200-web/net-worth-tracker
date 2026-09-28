@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { processInbox, applyEntry, parseCaptureAmount, InboxItem } from './inbox';
+import { processInbox, applyEntry, parseCaptureAmount, isRecordedIn, InboxItem } from './inbox';
 import { AppData } from '../types';
 
 const baseData = (): AppData => ({
@@ -229,5 +229,25 @@ describe('applyEntry', () => {
     expect(twice).toBe(once);
     expect(once.expenses).toHaveLength(1);
     expect(once.accounts.find(a => a.id === 'savings')!.balance).toBe(710000);
+  });
+});
+
+describe('isRecordedIn', () => {
+  it('finds a booked Apple Pay capture and a paired SMS', () => {
+    const { data } = processInbox(baseData(), [applePay('a1'), creditSms('s1')]);
+    expect(isRecordedIn(data, 'a1')).toBe(true);
+    expect(isRecordedIn(data, 's1')).toBe(true);
+  });
+
+  it('finds a reviewed income', () => {
+    const data = applyEntry(baseData(), {
+      itemId: 's3', origin: 'sms', kind: 'income', amount: 1, currency: 'COP', description: 'x',
+      category: 'Other', date: '2026-09-03', time: '18:35', accountId: 'savings', reason: '',
+    });
+    expect(isRecordedIn(data, 's3')).toBe(true);
+  });
+
+  it('is false for items that leave no trace (unreadable SMS)', () => {
+    expect(isRecordedIn(baseData(), 'x')).toBe(false);
   });
 });
