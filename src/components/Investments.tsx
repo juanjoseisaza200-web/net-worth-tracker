@@ -83,7 +83,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     amount: '',
     interestRate: '',
     maturityDate: '',
-    currency: 'USD' as Currency,
+    currency: 'COP' as Currency,
     linkedAccountId: '',
   });
 
@@ -110,7 +110,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   const resetForms = () => {
     setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
     setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
-    setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'USD', linkedAccountId: '' });
+    setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'COP', linkedAccountId: '' });
     setEditingItem(null);
     setShowForm(false);
   };

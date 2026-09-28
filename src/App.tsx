@@ -8,7 +8,7 @@ import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
 import Header from './components/Header';
 import { fetchExchangeRates } from './utils/currency';
-import { recordNetWorthSnapshot } from './utils/calculations';
+import { recordNetWorthSnapshot, roundAccountBalances } from './utils/calculations';
 import { accrueFixedIncome } from './utils/fixedIncome';
 import { processInbox, applyEntry, isRecordedIn, InboxItem, PendingEntry } from './utils/inbox';
 
@@ -100,7 +100,9 @@ function App() {
               // interest, then run scheduled automations / recurring incomes.
               // Both return the same reference when nothing changes.
               const accrued = accrueFixedIncome(cloudData);
-              const { newData, messages } = (await import('./utils/automations')).processAutomations(accrued);
+              const { newData: automated, messages } = (await import('./utils/automations')).processAutomations(accrued);
+              // Same reference when nothing needed rounding, so the check below still works.
+              const newData = roundAccountBalances(automated);
 
               // Reflect the data BEFORE the save round-trip: setting it after
               // the await would revert anything newer that landed meanwhile.
@@ -176,7 +178,7 @@ function App() {
     (async () => {
       try {
         if (next !== data) {
-          const toSave = recordNetWorthSnapshot(next);
+          const toSave = roundAccountBalances(recordNetWorthSnapshot(next));
           setData(toSave);
           saveData(toSave);
           await saveDataToCloud(user.uid, toSave);
@@ -193,7 +195,7 @@ function App() {
   const resolvePending = async (itemId: string, entry: PendingEntry | null) => {
     if (!user || !isCloudSynced || !inboxKey) return;
     if (entry) {
-      const toSave = recordNetWorthSnapshot(applyEntry(data, entry));
+      const toSave = roundAccountBalances(recordNetWorthSnapshot(applyEntry(data, entry)));
       setData(toSave);
       saveData(toSave);
       await saveDataToCloud(user.uid, toSave);
@@ -216,7 +218,8 @@ function App() {
 
     // Record today's net-worth snapshot as a side effect of every explicit save
     // (deduped per day) so the history/trend chart accumulates over time.
-    const dataToSave = recordNetWorthSnapshot(newData);
+    // Balances are kept in cents: conversions otherwise leave float noise.
+    const dataToSave = roundAccountBalances(recordNetWorthSnapshot(newData));
 
     // 1. Optimistic Update (Local)
     setData(dataToSave);

@@ -25,3 +25,14 @@ export function getOrdinalSuffix(day: number): string {
     default: return 'th';
   }
 }
+
+/**
+ * Today as YYYY-MM-DD in the device's local time zone. Don't use
+ * `new Date().toISOString()` for this: that is UTC, so in Colombia (UTC-5) it
+ * already says tomorrow from 7 pm, and the last day of a month rolls into the
+ * next one.
+ */
+export const todayLocal = (): string => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};

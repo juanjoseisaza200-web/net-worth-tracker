@@ -1,5 +1,5 @@
 import { AppData, Currency, Account } from '../types';
-import { calculateTotalExpenses, calculateTotalIncome } from './calculations';
+import { calculateTotalExpenses, calculateTotalIncome, roundAccountBalances } from './calculations';
 import { sanitizeCurrency } from './currency';
 
 const STORAGE_KEY = 'net-worth-tracker-data';
@@ -74,7 +74,8 @@ export const migrateData = (data: any): AppData => {
     if (Array.isArray(data.recurringIncomes)) data.recurringIncomes.forEach((r: any) => r.accountId = defaultAccountId);
   }
 
-  return data as AppData;
+  // Drop float noise left in balances by past currency conversions.
+  return roundAccountBalances(data as AppData);
 };
 
 import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';

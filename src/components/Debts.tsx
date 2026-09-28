@@ -20,7 +20,7 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
   const [type, setType] = useState<'receivable' | 'payable'>('receivable');
   const [personName, setPersonName] = useState('');
   const [amount, setAmount] = useState('');
-  const [currency, setCurrency] = useState<Currency>(baseCurrency);
+  const [currency, setCurrency] = useState<Currency>('COP');
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
 
@@ -45,7 +45,7 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
       setType(initialType);
       setPersonName('');
       setAmount('');
-      setCurrency(baseCurrency);
+      setCurrency('COP');
       setDescription('');
       setDueDate('');
     }

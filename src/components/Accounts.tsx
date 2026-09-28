@@ -62,7 +62,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     const [addForm, setAddForm] = useState({
         name: '',
         type: 'checking' as AccountType,
-        currency: 'USD' as Currency,
+        currency: 'COP' as Currency,
         balance: '',
         statementDay: DEFAULT_STATEMENT_DAY,
         paymentDueDate: '',
@@ -96,7 +96,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     const emptyAddForm = {
         name: '',
         type: 'checking' as AccountType,
-        currency: 'USD' as Currency,
+        currency: 'COP' as Currency,
         balance: '',
         statementDay: DEFAULT_STATEMENT_DAY,
         paymentDueDate: '',

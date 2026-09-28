@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AppData, Automation, RecurringIncome } from '../types';
-import { processAutomations } from './automations';
+import { processAutomations, initialLastRunMonth } from './automations';
 
 const twoAccounts = (): AppData => ({
   accounts: [
@@ -110,5 +110,39 @@ describe('processAutomations', () => {
     const { newData, messages } = processAutomations(data);
     expect(messages).toHaveLength(0);
     expect(newData).toBe(data);
+  });
+});
+
+describe('initialLastRunMonth', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("skips this month when the day already passed, so it doesn't deposit on creation", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 28)); // Sep 28
+    expect(initialLastRunMonth(15)).toBe('2026-09');
+  });
+
+  it('still pays this month when the day has not come yet', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 10)); // Sep 10
+    expect(initialLastRunMonth(15)).toBe('2026-08');
+  });
+
+  it('handles January', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 0, 3));
+    expect(initialLastRunMonth(15)).toBe('2025-12');
+  });
+
+  it('a new recurring income created after its day does not deposit when processed', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 28));
+    const data = twoAccounts();
+    data.recurringIncomes = [{
+      id: 'r', amount: 100, currency: 'USD', description: 'Salary', category: 'Salary',
+      dayOfMonth: 15, isActive: true, accountId: data.accounts[0].id, lastRunMonth: initialLastRunMonth(15),
+    }];
+    const { messages } = processAutomations(data);
+    expect(messages).toEqual([]);
   });
 });

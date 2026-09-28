@@ -6,6 +6,8 @@ import {
   calculateTotalIncome,
   recordNetWorthSnapshot,
   calculateCategoryBreakdown,
+  calculateCurrencyExposure,
+  roundAccountBalances,
 } from './calculations';
 import { Expense } from '../types';
 
@@ -112,5 +114,33 @@ describe('period filters', () => {
       { id: 'i1', amount: 300, currency: 'USD', description: '', category: '', date: '2026-03-01', accountId: 'a' },
     ];
     expect(calculateTotalIncome(data, 'USD', 'month')).toBe(300);
+  });
+});
+
+describe('calculateCurrencyExposure', () => {
+  it('adds up to 100% even with credit-card debt', () => {
+    // Before: shares were divided by net worth (which subtracts the card), so
+    // COP + USD came to more than 100%.
+    const data = baseData();
+    data.accounts.push({ id: 'cop', name: 'Ahorros', balance: 4166666.67, currency: 'COP', type: 'savings' });
+    data.accounts.push({ id: 'card', name: 'Visa', balance: -2000000, currency: 'COP', type: 'credit' });
+    const exposure = calculateCurrencyExposure(data, 'COP');
+    const total = exposure.reduce((sum, e) => sum + e.percentage, 0);
+    expect(total).toBeCloseTo(100, 6);
+    expect(exposure.every(e => e.percentage >= 0 && e.percentage <= 100)).toBe(true);
+  });
+});
+
+describe('roundAccountBalances', () => {
+  it('rounds balances to cents', () => {
+    const data = baseData();
+    data.accounts[0].balance = 14054342.661916541;
+    expect(roundAccountBalances(data).accounts[0].balance).toBe(14054342.66);
+  });
+
+  it('returns the same object when every balance is already in cents', () => {
+    const data = baseData();
+    data.accounts[0].balance = 1577772.5;
+    expect(roundAccountBalances(data)).toBe(data);
   });
 });

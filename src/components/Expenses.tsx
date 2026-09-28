@@ -5,7 +5,8 @@ import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
 import { formatCurrency, formatCurrencyTrimmed, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome, calculateCategoryBreakdown } from '../utils/calculations';
 import { expenseCategories, incomeCategories } from '../utils/categories';
-import { formatDateForDisplay, getOrdinalSuffix } from '../utils/date';
+import { formatDateForDisplay, getOrdinalSuffix, todayLocal } from '../utils/date';
+import { initialLastRunMonth } from '../utils/automations';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
 import ChartErrorBoundary from './ChartErrorBoundary';
@@ -77,25 +78,25 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
-    currency: 'USD' as Currency,
+    currency: 'COP' as Currency,
     description: '',
     category: 'Other',
-    date: new Date().toISOString().split('T')[0],
+    date: todayLocal(),
     accountId: data.accounts?.[0]?.id || '',
   });
 
   const [incomeForm, setIncomeForm] = useState({
     amount: '',
-    currency: 'USD' as Currency,
+    currency: 'COP' as Currency,
     description: '',
     category: 'Salary',
-    date: new Date().toISOString().split('T')[0],
+    date: todayLocal(),
     accountId: data.accounts?.[0]?.id || '',
   });
 
   const [recurringForm, setRecurringForm] = useState({
     amount: '',
-    currency: 'USD' as Currency,
+    currency: 'COP' as Currency,
     description: '',
     category: 'Salary',
     dayOfMonth: 1,
@@ -166,10 +167,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     setExpenseForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Other',
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       accountId: data.accounts?.[0]?.id || '',
     });
     setShowForm(false);
@@ -238,10 +239,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     setIncomeForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Salary',
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       accountId: data.accounts?.[0]?.id || '',
     });
     setShowForm(false);
@@ -278,6 +279,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         dayOfMonth: recurringForm.dayOfMonth,
         isActive: recurringForm.isActive,
         accountId: recurringForm.accountId,
+        // Without this, a new income whose day already passed this month is
+        // deposited the moment it's saved.
+        lastRunMonth: initialLastRunMonth(recurringForm.dayOfMonth),
       };
       setData({
         ...data,
@@ -287,7 +291,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     setRecurringForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Salary',
       dayOfMonth: 1,
@@ -421,23 +425,23 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   const resetForms = () => {
     setExpenseForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Other',
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       accountId: data.accounts?.[0]?.id || '',
     });
     setIncomeForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Salary',
-      date: new Date().toISOString().split('T')[0],
+      date: todayLocal(),
       accountId: data.accounts?.[0]?.id || '',
     });
     setRecurringForm({
       amount: '',
-      currency: 'USD',
+      currency: 'COP',
       description: '',
       category: 'Salary',
       dayOfMonth: 1,

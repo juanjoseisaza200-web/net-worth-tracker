@@ -1,6 +1,24 @@
 import { AppData, ActivityLog, Income } from '../types';
 import { convertCurrency } from './currency';
 
+/**
+ * lastRunMonth for a recurring income created today. processAutomations pays
+ * one missing month right away, so a new income whose day already passed this
+ * month would be deposited the moment it is saved (double-counting a salary
+ * already recorded). Mark this month as done in that case; otherwise mark last
+ * month, so it pays this month when the day comes. Same rule as new Automations.
+ */
+export function initialLastRunMonth(dayOfMonth: number): string {
+  const now = new Date();
+  const monthStr = (y: number, m: number) => {
+    const d = new Date(y, m, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  };
+  return now.getDate() >= dayOfMonth
+    ? monthStr(now.getFullYear(), now.getMonth())
+    : monthStr(now.getFullYear(), now.getMonth() - 1);
+}
+
 export function processAutomations(data: AppData): { newData: AppData; messages: string[] } {
   const hasAutomations = data.automations && data.automations.length > 0;
   const hasRecurringIncomes = data.recurringIncomes && data.recurringIncomes.length > 0;

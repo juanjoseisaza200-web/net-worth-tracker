@@ -107,14 +107,19 @@ export const calculateCurrencyExposure = (data: AppData, targetCurrency: Currenc
   });
   data.variableInvestments.forEach(inv => addExposure(inv.currency, inv.currentValue || inv.amount));
 
-  const totalNetWorth = calculateNetWorth(data, targetCurrency);
-  if (totalNetWorth === 0) return [];
+  // Share of the assets listed here — not of net worth, which also
+  // subtracts card debt and would push the shares above 100%.
+  const totalAssets = Object.keys(exposureMap).reduce(
+    (sum, cur) => sum + convertCurrency(exposureMap[cur as Currency]!, cur as Currency, targetCurrency),
+    0,
+  );
+  if (totalAssets <= 0) return [];
 
   const exposureList = Object.keys(exposureMap).map(cur => {
     const currency = cur as Currency;
     const nativeValue = exposureMap[currency]!;
     const convertedValue = convertCurrency(nativeValue, currency, targetCurrency);
-    const percentage = (convertedValue / totalNetWorth) * 100;
+    const percentage = (convertedValue / totalAssets) * 100;
     return {
       currency,
       nativeValue,
@@ -259,3 +264,13 @@ export const calculateTotalIncome = (data: AppData, targetCurrency: Currency, pe
   return total;
 };
 
+/**
+ * Round every account balance to cents. Currency conversions leave float noise
+ * (a balance of 14054342.661916541) that shows up when editing an account and
+ * keeps accumulating. Returns the same object when nothing needs rounding.
+ */
+export const roundAccountBalances = (data: AppData): AppData => {
+  const round = (n: number) => Math.round(n * 100) / 100;
+  if (!data.accounts?.some(a => a.balance !== round(a.balance))) return data;
+  return { ...data, accounts: data.accounts.map(a => ({ ...a, balance: round(a.balance) })) };
+};

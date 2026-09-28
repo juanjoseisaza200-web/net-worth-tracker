@@ -3,6 +3,7 @@ import { RefreshCw, User as UserIcon, Download, Upload, Smartphone, Copy, Trendi
 import { useState, useRef } from 'react';
 import { AppData } from '../types';
 import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
+import { todayLocal } from '../utils/date';
 import { migrateData, generateInboxKey, registerInboxKey, unregisterInboxKey } from '../utils/storage';
 import { db } from '../firebase';
 import { PageTitle, Section, Row, IconSquare, Switch, Segmented } from './ios';
@@ -30,7 +31,7 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        const today = new Date().toISOString().split('T')[0];
+        const today = todayLocal();
         a.download = `net-worth-backup-${today}.json`;
         // Append to the DOM before clicking and defer the revoke — some mobile
         // browsers won't start the download otherwise.
