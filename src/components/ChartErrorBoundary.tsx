@@ -30,7 +30,7 @@ export default class ChartErrorBoundary extends React.Component<Props, State> {
     if (this.state.hasError) {
       return (
         this.props.fallback ?? (
-          <div className="text-center text-gray-400 text-sm py-8">
+          <div className="text-center text-ios-secondary text-ios-subhead py-8">
             Chart unavailable.
           </div>
         )

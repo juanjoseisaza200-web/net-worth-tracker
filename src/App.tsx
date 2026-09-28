@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Wallet, TrendingUp, DollarSign, Building2, Users, Inbox } from 'lucide-react';
+import { Wallet, TrendingUp, DollarSign, Building2, Users, Inbox, ChevronRight } from 'lucide-react';
 import { AppData, Currency } from './types';
 import { loadData, saveData, subscribeToData, saveDataToCloud, subscribeToInbox, deleteInboxItem } from './utils/storage';
 import { auth } from './firebase';
@@ -253,8 +253,8 @@ function App() {
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
-        <p className="text-gray-600">Loading your finances...</p>
+        <div className="animate-spin rounded-full h-10 w-10 border-[3px] border-ios-fill border-t-ios-gray mb-4"></div>
+        <p className="text-ios-secondary">Loading your finances...</p>
       </div>
     );
   }
@@ -262,12 +262,12 @@ function App() {
   if (initError) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm text-center">
-          <div className="text-red-500 mb-2">⚠️ Error</div>
-          <p className="text-gray-700 mb-4">{initError}</p>
+        <div className="bg-ios-card p-6 rounded-ios max-w-sm text-center">
+          <div className="text-ios-red text-ios-headline mb-2">Error</div>
+          <p className="text-ios-secondary mb-4">{initError}</p>
           <button
             onClick={() => window.location.reload()}
-            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+            className="h-11 px-6 rounded-full bg-ios-blue text-white text-ios-headline active:opacity-80"
           >
             Retry
           </button>
@@ -282,29 +282,29 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50 pb-20 relative">
+      <div className="min-h-screen bg-ios-bg pb-20 relative">
         {user && <Header user={user} />}
 
         {/* Save Status Indicator */}
         <div className="fixed top-4 right-4 z-50 flex flex-col items-end pointer-events-none">
           {isSaving && (
-            <div className="bg-blue-600 text-white text-xs px-3 py-1 rounded-full shadow-lg flex items-center gap-2 animate-pulse">
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              Saving...
+            <div className="ios-material text-ios-secondary text-ios-caption font-medium px-3 py-1.5 rounded-full flex items-center gap-2">
+              <div className="w-3 h-3 border-2 border-ios-fill border-t-ios-gray rounded-full animate-spin"></div>
+              Saving…
             </div>
           )}
           {!isSaving && lastSaved && !saveError && (
-            <div className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded-full shadow border border-green-200 opacity-75 transition-opacity duration-1000">
-              Saved ✅
+            <div className="ios-material text-ios-green text-ios-caption font-medium px-3 py-1.5 rounded-full">
+              Saved
             </div>
           )}
           {saveError && (
-            <div className="pointer-events-auto bg-red-100 text-red-800 text-xs px-3 py-1.5 rounded-full shadow border border-red-200 flex items-center gap-2">
-              <span>⚠️ {saveError}</span>
+            <div className="pointer-events-auto ios-material text-ios-red text-ios-caption font-medium px-3 py-1.5 rounded-full flex items-center gap-2">
+              <span>{saveError}</span>
               <button
                 onClick={handleManualSync}
                 disabled={isSaving}
-                className="font-semibold underline hover:text-red-900 disabled:opacity-50"
+                className="font-semibold text-ios-blue disabled:opacity-50"
               >
                 Retry
               </button>
@@ -316,7 +316,7 @@ function App() {
           <ReviewBanner count={inbox.pending.length} />
           <Suspense fallback={
             <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-[3px] border-ios-fill border-t-ios-gray"></div>
             </div>
           }>
           <Routes>
@@ -342,13 +342,15 @@ function ReviewBanner({ count }: { count: number }) {
   return (
     <Link
       to="/review"
-      className="mx-4 mt-4 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 text-sm font-medium"
+      className="mx-4 mb-4 flex items-center gap-3 bg-ios-card rounded-ios pl-4 pr-3 py-3 active:bg-ios-fill"
     >
-      <span className="flex items-center gap-2">
-        <Inbox size={18} />
+      <span className="w-[30px] h-[30px] rounded-[8px] bg-ios-orange text-white flex items-center justify-center shrink-0">
+        <Inbox size={18} strokeWidth={2.25} />
+      </span>
+      <span className="flex-1 text-ios-body">
         {count} captured {count === 1 ? 'transaction' : 'transactions'} to review
       </span>
-      <span aria-hidden>→</span>
+      <ChevronRight size={18} className="text-ios-tertiary" strokeWidth={2.5} />
     </Link>
   );
 }
@@ -365,8 +367,11 @@ function Navigation() {
   ];
 
   return (
-    <nav className="fixed bottom-4 left-4 right-4 bg-white border border-gray-200 shadow-lg rounded-2xl">
-      <div className="flex justify-around items-center h-16">
+    <nav
+      className="ios-material fixed bottom-4 left-3 right-3 max-w-md mx-auto rounded-full z-40"
+      style={{ boxShadow: '0 0 0 0.5px var(--ios-separator), 0 8px 24px rgba(0, 0, 0, 0.12)' }}
+    >
+      <div className="flex justify-around items-center h-16 px-1">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -374,11 +379,11 @@ function Navigation() {
             <Link
               key={item.path}
               to={item.path}
-              className={`flex flex-col items-center justify-center flex-1 h-full ${isActive ? 'text-blue-600' : 'text-gray-500'
+              className={`flex flex-col items-center justify-center flex-1 h-12 rounded-full transition-colors ${isActive ? 'text-ios-blue bg-ios-fill' : 'text-ios-label'
                 }`}
             >
-              <Icon size={24} />
-              <span className="text-xs mt-1">{item.label}</span>
+              <Icon size={22} strokeWidth={isActive ? 2.25 : 1.75} />
+              <span className="text-[10px] font-medium mt-0.5">{item.label}</span>
             </Link>
           );
         })}

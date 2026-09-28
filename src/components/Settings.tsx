@@ -1,11 +1,13 @@
 import { User } from 'firebase/auth';
-import { LogOut, RefreshCw, User as UserIcon, ArrowLeft, RefreshCwOff, Download, Upload, Smartphone, Copy } from 'lucide-react';
+import { RefreshCw, User as UserIcon, Download, Upload, Smartphone, Copy, TrendingUp, ArrowLeftRight } from 'lucide-react';
 import { useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
 import { AppData } from '../types';
 import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
 import { migrateData, generateInboxKey, registerInboxKey, unregisterInboxKey } from '../utils/storage';
 import { db } from '../firebase';
+import { PageTitle, Section, Row, IconSquare, Switch, Segmented } from './ios';
+import { ios } from './iosStyles';
+import { ThemePref, getThemePref, setThemePref } from '../utils/theme';
 
 interface SettingsProps {
     user: User;
@@ -19,6 +21,7 @@ interface SettingsProps {
 export default function Settings({ user, onLogout, onSync, data, setData }: SettingsProps) {
     const [syncing, setSyncing] = useState(false);
     const [fetchingRates, setFetchingRates] = useState(false);
+    const [theme, setTheme] = useState<ThemePref>(getThemePref);
     const autoUpdatePrices = data.settings?.autoUpdatePrices ?? true;
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,190 +122,159 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
         setTimeout(() => setFetchingRates(false), 800);
     };
 
-    return (
-        <div className="min-h-screen bg-gray-50 pb-20">
-            <header className="bg-white border-b border-gray-200 px-4 py-4 flex items-center gap-3 sticky top-0 z-10">
-                <Link to="/" className="text-gray-600 hover:text-gray-900">
-                    <ArrowLeft size={24} />
-                </Link>
-                <h1 className="text-xl font-bold text-gray-800">Settings</h1>
-            </header>
+    const handleThemeChange = (pref: ThemePref) => {
+        setTheme(pref);
+        setThemePref(pref);
+    };
 
-            <div className="p-4 max-w-md mx-auto space-y-6">
-                {/* Profile Section */}
-                <div className="bg-white rounded-xl shadow-sm p-6 flex flex-col items-center">
+    return (
+        <div className="px-4 pb-4">
+            <PageTitle title="Settings" />
+
+            <div className="space-y-6">
+                {/* Profile */}
+                <div className={`${ios.card} p-5 flex items-center gap-4`}>
                     {user.photoURL ? (
-                        <img
-                            src={user.photoURL}
-                            alt="Profile"
-                            className="w-20 h-20 rounded-full border-4 border-gray-100 mb-4"
-                        />
+                        <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full" />
                     ) : (
-                        <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 mb-4">
-                            <UserIcon size={40} />
+                        <div className="w-16 h-16 rounded-full bg-ios-fill flex items-center justify-center text-ios-blue">
+                            <UserIcon size={30} />
                         </div>
                     )}
-                    <h2 className="text-lg font-bold text-gray-900">{user.displayName || 'User'}</h2>
-                    <p className="text-gray-500">{user.email}</p>
-                </div>
-
-                {/* Actions Section */}
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-                    <div className="px-6 py-4 flex items-center justify-between border-b border-gray-100">
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${autoUpdatePrices ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                {autoUpdatePrices ? <RefreshCw size={20} /> : <RefreshCwOff size={20} />}
-                            </div>
-                            <div className="text-left">
-                                <span className="block font-medium text-gray-900">Auto-update Prices</span>
-                                <span className="block text-xs text-gray-500">Fetch live stock/crypto prices</span>
-                            </div>
-                        </div>
-                        <button
-                            onClick={toggleAutoUpdate}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${autoUpdatePrices ? 'bg-blue-600' : 'bg-gray-200'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${autoUpdatePrices ? 'translate-x-6' : 'translate-x-1'}`} />
-                        </button>
+                    <div className="min-w-0">
+                        <div className="text-ios-title3 font-semibold truncate">{user.displayName || 'User'}</div>
+                        <div className="text-ios-subhead text-ios-secondary truncate">{user.email}</div>
                     </div>
-
-                    <button
-                        onClick={handleSync}
-                        disabled={syncing}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full bg-blue-50 text-blue-600 ${syncing ? 'animate-spin' : ''}`}>
-                                <RefreshCw size={20} />
-                            </div>
-                            <div className="text-left">
-                                <span className="block font-medium text-gray-900">Sync Data</span>
-                                <span className="block text-xs text-gray-500">Force upload local data to cloud</span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={handleFetchRates}
-                        disabled={fetchingRates}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-full ${isUsingLiveRates ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'} ${fetchingRates ? 'animate-spin' : ''}`}>
-                                <RefreshCw size={20} />
-                            </div>
-                            <div className="text-left">
-                                <span className="block font-medium text-gray-900">Exchange Rates</span>
-                                <span className="block text-xs text-gray-500">
-                                    {isUsingLiveRates 
-                                        ? `Live (Updated ${lastExchangeRatesUpdate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})` 
-                                        : 'Using hardcoded fallbacks'}
-                                </span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={handleExport}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-indigo-50 text-indigo-600">
-                                <Download size={20} />
-                            </div>
-                            <div className="text-left">
-                                <span className="block font-medium text-gray-900">Export Data</span>
-                                <span className="block text-xs text-gray-500">Download a JSON backup of everything</span>
-                            </div>
-                        </div>
-                    </button>
-
-                    <button
-                        onClick={handleImportClick}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors border-b border-gray-100"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-indigo-50 text-indigo-600">
-                                <Upload size={20} />
-                            </div>
-                            <div className="text-left">
-                                <span className="block font-medium text-gray-900">Import Data</span>
-                                <span className="block text-xs text-gray-500">Restore from a JSON backup (replaces all data)</span>
-                            </div>
-                        </div>
-                    </button>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="application/json,.json"
-                        onChange={handleImportFile}
-                        className="hidden"
-                    />
-
-                    <button
-                        onClick={onLogout}
-                        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors text-red-600"
-                    >
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 rounded-full bg-red-50 text-red-600">
-                                <LogOut size={20} />
-                            </div>
-                            <span className="font-medium">Sign Out</span>
-                        </div>
-                    </button>
                 </div>
+
+                <Section title="Appearance" footer="System follows your iPhone's Light/Dark setting. This choice is saved on this device only.">
+                    <div className="p-3">
+                        <Segmented
+                            value={theme}
+                            onChange={handleThemeChange}
+                            options={[
+                                { value: 'system', label: 'System' },
+                                { value: 'light', label: 'Light' },
+                                { value: 'dark', label: 'Dark' },
+                            ]}
+                        />
+                    </div>
+                </Section>
+
+                <Section title="General">
+                    <Row
+                        icon={<IconSquare icon={TrendingUp} color="var(--ios-green)" />}
+                        title="Auto-update Prices"
+                        subtitle="Fetch live stock/crypto prices"
+                        accessory={<Switch checked={autoUpdatePrices} onChange={toggleAutoUpdate} label="Auto-update Prices" />}
+                    />
+                    <Row
+                        icon={<IconSquare icon={ArrowLeftRight} color={isUsingLiveRates ? 'var(--ios-green)' : 'var(--ios-orange)'} />}
+                        title="Exchange Rates"
+                        subtitle={isUsingLiveRates
+                            ? `Live (Updated ${lastExchangeRatesUpdate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+                            : 'Using hardcoded fallbacks'}
+                        accessory={
+                            <button onClick={handleFetchRates} disabled={fetchingRates} className={ios.rowAction} aria-label="Refresh exchange rates">
+                                <RefreshCw size={18} className={fetchingRates ? 'animate-spin' : ''} />
+                            </button>
+                        }
+                    />
+                    <Row
+                        icon={<IconSquare icon={RefreshCw} color="var(--ios-blue)" />}
+                        title="Sync Data"
+                        subtitle="Force upload local data to cloud"
+                        accessory={
+                            <button onClick={handleSync} disabled={syncing} className={ios.rowAction} aria-label="Sync data">
+                                <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} />
+                            </button>
+                        }
+                    />
+                </Section>
+
+                <Section title="Data">
+                    <Row
+                        icon={<IconSquare icon={Download} color="var(--ios-indigo)" />}
+                        title="Export Data"
+                        subtitle="Download a JSON backup of everything"
+                        onClick={handleExport}
+                    />
+                    <Row
+                        icon={<IconSquare icon={Upload} color="var(--ios-indigo)" />}
+                        title="Import Data"
+                        subtitle="Restore from a JSON backup (replaces all data)"
+                        onClick={handleImportClick}
+                    />
+                </Section>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json,.json"
+                    onChange={handleImportFile}
+                    className="hidden"
+                />
 
                 {/* Automatic capture (iPhone shortcuts -> review queue) */}
-                <div className="bg-white rounded-xl shadow-sm p-6 space-y-3">
-                    <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-full ${inboxKey ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                            <Smartphone size={20} />
-                        </div>
-                        <div>
-                            <span className="block font-medium text-gray-900">Automatic Capture</span>
-                            <span className="block text-xs text-gray-500">Apple Pay taps and Bancolombia SMS via iPhone Shortcuts</span>
-                        </div>
-                    </div>
-                    {inboxKey ? (
-                        <>
-                            <p className="text-xs text-gray-500">
-                                Shortcut URL. Anyone with it can add transactions to your review queue (never read your data) — keep it private.
-                            </p>
-                            <div className="flex gap-2">
-                                <input
-                                    readOnly
-                                    value={captureUrl}
-                                    onFocus={(e) => e.target.select()}
-                                    className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg text-xs font-mono bg-gray-50"
-                                />
-                                <button
-                                    onClick={handleCopyUrl}
-                                    className="px-3 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1"
-                                >
-                                    <Copy size={14} /> {copied ? 'Copied' : 'Copy'}
-                                </button>
-                            </div>
+                <Section
+                    title="Automatic Capture"
+                    footer={inboxKey
+                        ? 'Anyone with this URL can add transactions to your review queue (never read your data) — keep it private.'
+                        : 'Apple Pay taps and Bancolombia SMS via iPhone Shortcuts.'}
+                >
+                    <Row
+                        icon={<IconSquare icon={Smartphone} color={inboxKey ? 'var(--ios-green)' : 'var(--ios-gray)'} />}
+                        title="Shortcut URL"
+                        subtitle={inboxKey ? 'Enabled' : 'Off'}
+                        accessory={!inboxKey && (
                             <button
                                 onClick={handleEnableCapture}
                                 disabled={captureBusy}
-                                className="text-xs text-red-600 underline disabled:opacity-50"
+                                className="h-8 px-3 rounded-full bg-ios-blue text-white text-ios-subhead font-semibold disabled:opacity-50"
                             >
-                                Generate a new key
+                                {captureBusy ? 'Enabling…' : 'Enable'}
                             </button>
-                        </>
-                    ) : (
-                        <button
-                            onClick={handleEnableCapture}
-                            disabled={captureBusy}
-                            className="w-full bg-blue-600 text-white py-2 rounded-lg font-semibold disabled:opacity-50"
-                        >
-                            {captureBusy ? 'Enabling…' : 'Enable automatic capture'}
-                        </button>
+                        )}
+                    />
+                    {inboxKey && (
+                        <div className="ios-row pl-4">
+                            <div className="ios-row-content py-3 pr-4 space-y-3">
+                                <div className="flex gap-2">
+                                    <input
+                                        readOnly
+                                        value={captureUrl}
+                                        onFocus={(e) => e.target.select()}
+                                        className={`${ios.input} flex-1 min-w-0 !text-ios-caption font-mono`}
+                                    />
+                                    <button
+                                        onClick={handleCopyUrl}
+                                        className="h-10 px-3 rounded-full bg-ios-blue text-white text-ios-subhead font-semibold flex items-center gap-1 shrink-0"
+                                    >
+                                        <Copy size={14} /> {copied ? 'Copied' : 'Copy'}
+                                    </button>
+                                </div>
+                                <button
+                                    onClick={handleEnableCapture}
+                                    disabled={captureBusy}
+                                    className="text-ios-subhead text-ios-red active:opacity-60 disabled:opacity-50"
+                                >
+                                    Generate a New Key
+                                </button>
+                            </div>
+                        </div>
                     )}
-                </div>
+                </Section>
 
-                <div className="text-center text-xs text-gray-400 mt-8">
-                    Net Worth Tracker v1.5.0 - Multi-Account Update 🏦
+                <Section>
+                    <button
+                        onClick={onLogout}
+                        className="w-full min-h-[44px] text-ios-body text-ios-red active:bg-ios-fill"
+                    >
+                        Sign Out
+                    </button>
+                </Section>
+
+                <div className="text-center text-ios-footnote text-ios-tertiary">
+                    Net Worth Tracker v1.5.0
                 </div>
             </div>
         </div>

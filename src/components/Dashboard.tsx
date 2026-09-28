@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
-import { TrendingUp, TrendingDown, DollarSign, Settings2, Eye, EyeOff, ChevronUp, ChevronDown, Check, Wallet } from 'lucide-react';
-import { AppData, Currency, DashboardWidgetConfig } from '../types';
+import { useState } from 'react';
+import { TrendingUp, TrendingDown, SlidersHorizontal, ChevronUp, ChevronDown, Landmark, PiggyBank, Banknote, CreditCard, Wallet, LineChart as LineChartIcon, Bitcoin, Percent, ArrowLeftRight, Repeat } from 'lucide-react';
+import { AccountType, AppData, Currency, DashboardWidgetConfig } from '../types';
 import { calculateNetWorth, calculateTotalExpenses, calculateTotalIncome, calculateCurrencyExposure, calculateAssetAllocation } from '../utils/calculations';
 import { formatCurrency, formatCompactCurrency, formatAdaptiveCurrency, formatCurrencyNoDecimals, convertCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import CurrencySelect from './CurrencySelect';
 import ChartErrorBoundary from './ChartErrorBoundary';
+import { Section, Row, IconSquare, Switch } from './ios';
+import { useIosColors } from '../utils/useIosColors';
 
 interface DashboardProps {
   data: AppData;
@@ -38,6 +40,24 @@ const mergeLayout = (stored?: DashboardWidgetConfig[]): DashboardWidgetConfig[] 
   return [...stored, ...missing].sort((a, b) => a.order - b.order);
 };
 
+// Allocation colors come from calculations.ts as Tailwind classes; map them
+// onto the iOS system palette here so that file stays presentation-agnostic.
+const ALLOCATION_COLORS: Record<string, string> = {
+  'bg-green-500': 'var(--ios-green)',
+  'bg-blue-500': 'var(--ios-blue)',
+  'bg-purple-500': 'var(--ios-purple)',
+  'bg-orange-500': 'var(--ios-orange)',
+  'bg-gray-500': 'var(--ios-gray)',
+};
+
+const ACCOUNT_ICONS: Record<AccountType, { icon: typeof Landmark; color: string }> = {
+  checking: { icon: Landmark, color: 'var(--ios-blue)' },
+  savings: { icon: PiggyBank, color: 'var(--ios-green)' },
+  cash: { icon: Banknote, color: 'var(--ios-teal)' },
+  credit: { icon: CreditCard, color: 'var(--ios-orange)' },
+  other: { icon: Wallet, color: 'var(--ios-gray)' },
+};
+
 const WIDGET_NAMES: Record<string, string> = {
   netWorthHistory: 'Net Worth Trend',
   assetAllocation: 'Asset Allocation',
@@ -52,6 +72,7 @@ const WIDGET_NAMES: Record<string, string> = {
 
 export default function Dashboard({ data, setData, baseCurrency, onCurrencyChange }: DashboardProps) {
   const [showAllExpenses, setShowAllExpenses] = useState(false);
+  const colors = useIosColors();
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   
   const [layout, setLayout] = useState<DashboardWidgetConfig[]>(
@@ -79,7 +100,6 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
   const totalStocks = data.stocks.length;
   const totalCrypto = data.crypto.length;
   const totalFixedIncome = data.fixedIncome.length;
-  const totalVariable = data.variableInvestments.length;
 
   const handleSaveLayout = () => {
     setIsEditingLayout(false);
@@ -117,326 +137,270 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
     switch(id) {
       case 'netWorthHistory':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Net Worth Trend</h2>
+          <Section key={id} title="Net Worth Trend">
             {netWorthHistoryData.length < 2 ? (
-              <div className="text-center text-gray-400 text-sm py-8 px-2">
-                <TrendingUp size={28} className="mx-auto mb-2 text-gray-300" />
+              <div className="text-center text-ios-secondary text-ios-subhead py-8 px-6">
+                <TrendingUp size={28} className="mx-auto mb-2 text-ios-tertiary" />
                 {netWorthHistoryData.length === 0
                   ? 'Your net worth trend will build up here. A point is saved each day you make a change — check back after a couple of days.'
                   : 'Tracking started today. Once there are at least two days of history, your trend line will appear here.'}
               </div>
             ) : (
-              <ChartErrorBoundary>
-                <ResponsiveContainer width="100%" height={200}>
-                  <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 10 }} minTickGap={24} />
-                    <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 10 }} width={52} />
-                    <Tooltip
-                      formatter={(v) => formatCurrency(Number(v), baseCurrency)}
-                      labelFormatter={(d) => formatDateForDisplay(d as string)}
-                    />
-                    <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartErrorBoundary>
+              <div className="pt-4 pl-2 pr-3 pb-2">
+                <ChartErrorBoundary>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <LineChart data={netWorthHistoryData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid vertical={false} stroke={colors.separator} />
+                      <XAxis dataKey="date" tickFormatter={(d) => formatDateForDisplay(d)} tick={{ fontSize: 11, fill: colors.secondary }} axisLine={false} tickLine={false} minTickGap={24} />
+                      <YAxis tickFormatter={(v) => formatCompactCurrency(v, baseCurrency)} tick={{ fontSize: 11, fill: colors.secondary }} axisLine={false} tickLine={false} width={64} />
+                      <Tooltip
+                        formatter={(v) => formatCurrency(Number(v), baseCurrency)}
+                        labelFormatter={(d) => formatDateForDisplay(d as string)}
+                        contentStyle={{ background: 'var(--ios-card)', border: 'none', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', color: 'var(--ios-label)' }}
+                      />
+                      <Line type="monotone" dataKey="value" stroke={colors.blue} strokeWidth={2.5} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </ChartErrorBoundary>
+              </div>
             )}
-          </div>
+          </Section>
         );
 
       case 'assetAllocation':
         if (assetAllocation.length === 0) return null;
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Asset Allocation</h2>
-            <div className="w-full h-4 rounded-full flex overflow-hidden mb-4 bg-gray-100">
-              {assetAllocation.map(asset => (
-                <div key={asset.type} className={asset.color} style={{ width: `${asset.percentage}%` }} title={`${asset.type}: ${asset.percentage.toFixed(1)}%`} />
-              ))}
+          <Section key={id} title="Asset Allocation">
+            <div className="px-4 pt-4 pb-1">
+              <div className="w-full h-3 rounded-full flex overflow-hidden gap-[2px]">
+                {assetAllocation.map(asset => (
+                  <div key={asset.type} style={{ width: `${asset.percentage}%`, backgroundColor: ALLOCATION_COLORS[asset.color] }} title={`${asset.type}: ${asset.percentage.toFixed(1)}%`} />
+                ))}
+              </div>
             </div>
-            <div className="space-y-2">
-              {assetAllocation.map(asset => (
-                <div key={asset.type} className="flex justify-between items-center text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded-full ${asset.color}`}></div>
-                    <span className="font-medium text-gray-700">{asset.type}</span>
-                    <span className="text-gray-500">({asset.percentage.toFixed(1)}%)</span>
-                  </div>
-                  <div className="font-semibold text-gray-900">{formatCurrency(asset.value, baseCurrency)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+            {assetAllocation.map(asset => (
+              <Row
+                key={asset.type}
+                icon={<div className="w-2.5 h-2.5 rounded-full ml-1" style={{ backgroundColor: ALLOCATION_COLORS[asset.color] }} />}
+                title={asset.type}
+                value={formatCurrency(asset.value, baseCurrency)}
+                detail={`${asset.percentage.toFixed(1)}%`}
+              />
+            ))}
+          </Section>
         );
 
       case 'currencyExposure':
         if (currencyExposure.length === 0) return null;
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Currency Exposure</h2>
-            <div className="space-y-3">
-              {currencyExposure.map(exposure => (
-                <div key={exposure.currency}>
-                  <div className="flex justify-between items-end mb-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-gray-800">{exposure.currency}</span>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">{exposure.percentage.toFixed(1)}%</span>
+          <Section key={id} title="Currency Exposure">
+            {currencyExposure.map(exposure => (
+              <div key={exposure.currency} className="ios-row pl-4">
+                <div className="ios-row-content py-3 pr-4">
+                  <div className="flex justify-between items-baseline mb-2">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-ios-headline">{exposure.currency}</span>
+                      <span className="text-ios-footnote text-ios-secondary tabular-nums">{exposure.percentage.toFixed(1)}%</span>
                     </div>
                     <div className="text-right">
-                      <div className="font-semibold text-gray-900">{formatCurrency(exposure.nativeValue, exposure.currency)}</div>
-                      <div className="text-xs text-gray-500">≈ {formatCurrency(exposure.convertedValue, baseCurrency)}</div>
+                      <div className="text-ios-body tabular-nums">{formatCurrency(exposure.nativeValue, exposure.currency)}</div>
+                      <div className="text-ios-footnote text-ios-secondary tabular-nums">≈ {formatCurrency(exposure.convertedValue, baseCurrency)}</div>
                     </div>
                   </div>
-                  <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: `${exposure.percentage}%` }}></div>
+                  <div className="w-full bg-ios-fill rounded-full h-1.5 overflow-hidden">
+                    <div className="bg-ios-blue h-1.5 rounded-full" style={{ width: `${exposure.percentage}%` }}></div>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            ))}
+          </Section>
         );
 
       case 'quickStats':
         return (
-          <div key={id} className="grid grid-cols-2 gap-4">
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Monthly Income</span>
-                <TrendingUp size={20} className="text-green-500" />
+          <div key={id} className="grid grid-cols-2 gap-3">
+            <div className="bg-ios-card rounded-ios p-4">
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-green">
+                <TrendingUp size={16} strokeWidth={2.5} /> Income
               </div>
-              <div className="text-2xl font-bold text-green-600">{formatCompactCurrency(monthlyIncome, baseCurrency)}</div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">{formatCompactCurrency(monthlyIncome, baseCurrency)}</div>
+              <div className="text-ios-footnote text-ios-secondary">This month</div>
             </div>
-            <div className="bg-white rounded-lg shadow p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-gray-600">Monthly Expenses</span>
-                <TrendingDown size={20} className="text-red-500" />
+            <div className="bg-ios-card rounded-ios p-4">
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-red">
+                <TrendingDown size={16} strokeWidth={2.5} /> Expenses
               </div>
-              <div className="text-2xl font-bold text-red-600">{formatCompactCurrency(monthlyExpenses, baseCurrency)}</div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">{formatCompactCurrency(monthlyExpenses, baseCurrency)}</div>
+              <div className="text-ios-footnote text-ios-secondary">This month</div>
             </div>
           </div>
         );
 
       case 'netMonthly':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-gray-600">Net Monthly</span>
-              <DollarSign size={20} className={netMonthly >= 0 ? 'text-green-500' : 'text-red-500'} />
-            </div>
-            <div className={`text-3xl font-bold ${netMonthly >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {formatCompactCurrency(netMonthly, baseCurrency)}
+          <div key={id} className="bg-ios-card rounded-ios p-4">
+            <div className="text-ios-subhead font-semibold text-ios-secondary">Net this month</div>
+            <div className={`font-rounded text-[28px] leading-[34px] font-bold mt-1 tabular-nums ${netMonthly >= 0 ? 'text-ios-green' : 'text-ios-red'}`}>
+              {netMonthly >= 0 ? '+' : ''}{formatCompactCurrency(netMonthly, baseCurrency)}
             </div>
           </div>
         );
 
       case 'cashAccounts':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Cash Accounts</h2>
-            <div className="grid grid-cols-2 gap-4">
-              {(data.accounts || []).slice(0, 4).map(acc => (
-                <div key={acc.id} className="bg-indigo-50 rounded-lg p-3 overflow-hidden">
-                  <div className="text-sm text-gray-600 truncate">{acc.name}</div>
-                  <div className="text-xl font-bold text-indigo-600 truncate">{formatCompactCurrency(acc.balance, acc.currency)}</div>
-                </div>
-              ))}
-              {(!data.accounts || data.accounts.length === 0) && (
-                <div className="col-span-2 text-center text-gray-500 py-2">No accounts added yet.</div>
-              )}
-            </div>
-          </div>
+          <Section key={id} title="Accounts">
+            {(data.accounts || []).slice(0, 4).map(acc => {
+              const { icon, color } = ACCOUNT_ICONS[acc.type] || ACCOUNT_ICONS.other;
+              return (
+                <Row
+                  key={acc.id}
+                  to="/accounts"
+                  icon={<IconSquare icon={icon} color={color} />}
+                  title={acc.name}
+                  value={formatCompactCurrency(acc.balance, acc.currency)}
+                />
+              );
+            })}
+            {(!data.accounts || data.accounts.length === 0) && (
+              <div className="text-center text-ios-secondary py-4">No accounts added yet.</div>
+            )}
+          </Section>
         );
 
       case 'investmentSummary':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Investment Summary</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-blue-50 rounded-lg p-3">
-                <div className="text-sm text-gray-600">Stocks</div>
-                <div className="text-xl font-bold text-blue-600">{totalStocks}</div>
-              </div>
-              <div className="bg-purple-50 rounded-lg p-3">
-                <div className="text-sm text-gray-600">Crypto</div>
-                <div className="text-xl font-bold text-purple-600">{totalCrypto}</div>
-              </div>
-              <div className="bg-green-50 rounded-lg p-3">
-                <div className="text-sm text-gray-600">Fixed</div>
-                <div className="text-xl font-bold text-green-600">{totalFixedIncome}</div>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-3">
-                <div className="text-sm text-gray-600">Variable</div>
-                <div className="text-xl font-bold text-yellow-600">{totalVariable}</div>
-              </div>
-            </div>
-          </div>
+          <Section key={id} title="Investments">
+            <Row to="/investments" icon={<IconSquare icon={LineChartIcon} color="var(--ios-blue)" />} title="Stocks" value={totalStocks} />
+            <Row to="/investments" icon={<IconSquare icon={Bitcoin} color="var(--ios-purple)" />} title="Crypto" value={totalCrypto} />
+            <Row to="/investments" icon={<IconSquare icon={Percent} color="var(--ios-green)" />} title="Fixed Income" value={totalFixedIncome} />
+          </Section>
         );
 
       case 'activityLog':
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">Recent Transfers & Automations</h2>
+          <Section key={id} title="Transfers & Automations">
             {(!data.activityLogs || data.activityLogs.length === 0) ? (
-              <p className="text-gray-500 text-center py-4">No recent transfers</p>
+              <p className="text-ios-secondary text-center py-4">No recent transfers</p>
             ) : (
-              <div className="space-y-3">
-                {[...data.activityLogs]
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .slice(0, 10)
-                  .map(log => (
-                    <div key={log.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <div>
-                        <div className="font-medium text-gray-800 flex items-center gap-2">
-                          {log.type === 'automation' ? (
-                            <span className="bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded-full">Auto</span>
-                          ) : (
-                            <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full">Manual</span>
-                          )}
-                          {log.description}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-semibold text-blue-600 truncate max-w-[120px]">{formatCurrency(log.amount, log.currency)}</div>
-                        <div className="text-xs text-gray-500">{formatDateForDisplay(log.date.split('T')[0])}</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+              [...data.activityLogs]
+                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                .slice(0, 10)
+                .map(log => (
+                  <Row
+                    key={log.id}
+                    icon={<IconSquare icon={log.type === 'automation' ? Repeat : ArrowLeftRight} color={log.type === 'automation' ? 'var(--ios-indigo)' : 'var(--ios-gray)'} />}
+                    title={log.description}
+                    subtitle={log.type === 'automation' ? 'Automation' : log.type === 'cardPayment' ? 'Card payment' : 'Manual'}
+                    value={formatCurrencyNoDecimals(log.amount, log.currency)}
+                    detail={formatDateForDisplay(log.date.split('T')[0])}
+                  />
+                ))
             )}
-          </div>
+          </Section>
         );
 
-      case 'recentExpenses':
+      case 'recentExpenses': {
+        const visible = data.expenses
+          .filter(exp => showAllExpenses || exp.date.startsWith(currentMonthStr))
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         return (
-          <div key={id} className="bg-white rounded-lg shadow p-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold text-gray-800">
-                {showAllExpenses ? 'All Expenses' : 'Recent Expenses'}
-              </h2>
-              {data.expenses.some(exp => !exp.date.startsWith(currentMonthStr)) && (
-                <button
-                  onClick={() => setShowAllExpenses(!showAllExpenses)}
-                  className="text-sm text-blue-600 hover:text-blue-800 font-medium bg-blue-50 px-3 py-1 rounded-full"
-                >
-                  {showAllExpenses ? 'Less' : 'All'}
-                </button>
-              )}
-            </div>
-            {data.expenses.filter(exp => showAllExpenses || exp.date.startsWith(currentMonthStr)).length === 0 ? (
-              <p className="text-gray-500 text-center py-4">No expenses recorded for this period</p>
-            ) : (
-              <div className="space-y-2">
-                {data.expenses
-                  .filter(exp => showAllExpenses || exp.date.startsWith(currentMonthStr))
-                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-                  .map(expense => (
-                    <div key={expense.id} className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0">
-                      <div className="min-w-0 mr-2">
-                        <div className="font-medium text-gray-800 truncate">{expense.description}</div>
-                        <div className="text-sm text-gray-500">{expense.category}</div>
-                        <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                          <Wallet size={11} className="text-gray-400" />
-                          {accountNameById(expense.accountId)}
-                        </div>
-                      </div>
-                      <div className="text-right shrink-0">
-                        <div className="font-semibold text-red-600 truncate max-w-[120px]">{formatCurrencyNoDecimals(expense.amount, expense.currency)}</div>
-                        <div className="text-xs text-gray-500">{formatDateForDisplay(expense.date)}</div>
-                      </div>
-                    </div>
-                  ))}
-              </div>
+          <Section
+            key={id}
+            title={showAllExpenses ? 'All Expenses' : 'Recent Expenses'}
+            action={data.expenses.some(exp => !exp.date.startsWith(currentMonthStr)) && (
+              <button onClick={() => setShowAllExpenses(!showAllExpenses)} className="text-ios-subhead text-ios-blue active:opacity-60">
+                {showAllExpenses ? 'Show Less' : 'Show All'}
+              </button>
             )}
-          </div>
+          >
+            {visible.length === 0 ? (
+              <p className="text-ios-secondary text-center py-4">No expenses recorded for this period</p>
+            ) : (
+              visible.map(expense => (
+                <Row
+                  key={expense.id}
+                  title={expense.description}
+                  subtitle={`${expense.category} · ${accountNameById(expense.accountId)}`}
+                  value={<span className="text-ios-red">−{formatCurrencyNoDecimals(expense.amount, expense.currency)}</span>}
+                  detail={formatDateForDisplay(expense.date)}
+                />
+              ))
+            )}
+          </Section>
         );
+      }
 
       default: return null;
     }
   };
 
   return (
-    <div className="p-4">
-      {/* Header with Currency Selector & Edit Layout Button */}
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex flex-col">
-            <h1 className="text-2xl font-bold text-gray-800">Net Worth</h1>
-          </div>
-          <div className="flex items-center gap-2">
-            {!isEditingLayout ? (
-              <button 
-                onClick={() => setIsEditingLayout(true)}
-                className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                title="Customize Layout"
-              >
-                <Settings2 size={20} />
-              </button>
-            ) : (
-              <button 
-                onClick={handleSaveLayout}
-                className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm"
-              >
-                <Check size={16} /> Save
-              </button>
-            )}
-            
-            <CurrencySelect
-              value={baseCurrency}
-              onChange={onCurrencyChange}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            />
-          </div>
+    <div className="px-4 pb-4">
+      {/* Large title + actions, then the headline number */}
+      <div className="flex items-end justify-between px-1 pt-1">
+        <h1 className="text-ios-large">Net Worth</h1>
+        <div className="flex items-center gap-2 mb-1">
+          {!isEditingLayout ? (
+            <button
+              onClick={() => setIsEditingLayout(true)}
+              className="w-9 h-9 rounded-full bg-ios-fill text-ios-blue flex items-center justify-center active:opacity-60"
+              aria-label="Customize Layout"
+            >
+              <SlidersHorizontal size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSaveLayout}
+              className="h-9 px-4 rounded-full bg-ios-blue text-white text-ios-subhead font-semibold active:opacity-80"
+            >
+              Done
+            </button>
+          )}
+          <CurrencySelect
+            value={baseCurrency}
+            onChange={onCurrencyChange}
+            aria-label="View currency"
+            className="h-9 pl-3 pr-3 rounded-full bg-ios-fill text-ios-blue text-ios-subhead font-semibold appearance-none text-center focus:outline-none"
+          />
         </div>
-        <div className="text-4xl font-bold text-blue-600">
-          {formatAdaptiveCurrency(netWorth, baseCurrency)}
-        </div>
+      </div>
+      <div className="px-1 mt-1 mb-6 font-rounded text-[40px] leading-[48px] font-bold tabular-nums tracking-tight truncate">
+        {formatAdaptiveCurrency(netWorth, baseCurrency)}
       </div>
 
       {isEditingLayout ? (
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <p className="text-sm text-gray-600 mb-4 border-b border-gray-100 pb-3">
-            Use the up and down arrows to reorder widgets, or click the eye icon to hide them.
-          </p>
-          <div className="space-y-2">
-            {layout.map((widget, index) => (
-              <div 
-                key={widget.id}
-                className={`flex items-center justify-between p-3 rounded-lg border border-gray-200 bg-gray-50`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="flex flex-col gap-1">
-                    <button 
-                      onClick={() => moveWidget(index, 'up')}
-                      disabled={index === 0}
-                      className={`p-0.5 rounded ${index === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-200 hover:text-blue-600'}`}
-                    >
-                      <ChevronUp size={16} />
-                    </button>
-                    <button 
-                      onClick={() => moveWidget(index, 'down')}
-                      disabled={index === layout.length - 1}
-                      className={`p-0.5 rounded ${index === layout.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-200 hover:text-blue-600'}`}
-                    >
-                      <ChevronDown size={16} />
-                    </button>
-                  </div>
-                  <span className={`font-medium ml-2 ${!widget.visible ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                    {WIDGET_NAMES[widget.id] || widget.id}
-                  </span>
-                </div>
-                <button 
-                  onClick={() => toggleVisibility(widget.id)}
-                  className={`p-1.5 rounded-md transition-colors ${widget.visible ? 'text-blue-600 hover:bg-blue-100' : 'text-gray-400 hover:bg-gray-200'}`}
+        <Section title="Widgets" footer="Reorder with the arrows. Turn a widget off to hide it from your Net Worth screen.">
+          {layout.map((widget, index) => (
+            <div key={widget.id} className="ios-row flex items-center pl-2">
+              <div className="flex flex-col py-1">
+                <button
+                  onClick={() => moveWidget(index, 'up')}
+                  disabled={index === 0}
+                  aria-label="Move up"
+                  className="p-1 text-ios-blue disabled:text-ios-tertiary"
                 >
-                  {widget.visible ? <Eye size={18} /> : <EyeOff size={18} />}
+                  <ChevronUp size={16} />
+                </button>
+                <button
+                  onClick={() => moveWidget(index, 'down')}
+                  disabled={index === layout.length - 1}
+                  aria-label="Move down"
+                  className="p-1 text-ios-blue disabled:text-ios-tertiary"
+                >
+                  <ChevronDown size={16} />
                 </button>
               </div>
-            ))}
-          </div>
-        </div>
+              <div className="ios-row-content flex-1 flex items-center justify-between gap-3 py-2.5 pr-4 ml-2">
+                <span className={`text-ios-body ${widget.visible ? '' : 'text-ios-secondary'}`}>
+                  {WIDGET_NAMES[widget.id] || widget.id}
+                </span>
+                <Switch checked={widget.visible} onChange={() => toggleVisibility(widget.id)} label={`Show ${WIDGET_NAMES[widget.id] || widget.id}`} />
+              </div>
+            </div>
+          ))}
+        </Section>
       ) : (
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-6">
           {layout.filter(w => w.visible).map(w => renderWidget(w.id))}
         </div>
       )}

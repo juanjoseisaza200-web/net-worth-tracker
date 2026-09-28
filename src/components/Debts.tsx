@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Plus, Edit2, Users, DollarSign, ArrowUpRight, ArrowDownRight, Calendar } from 'lucide-react';
+import { Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { AppData, Currency, Debt } from '../types';
-import { formatCurrency, formatAdaptiveCurrency, convertCurrency } from '../utils/currency';
+import { formatCurrency, formatCurrencyTrimmed, formatAdaptiveCurrency, convertCurrency } from '../utils/currency';
 import CurrencySelect from './CurrencySelect';
+import { PageTitle, Section, Row, Segmented } from './ios';
+import { ios } from './iosStyles';
 
 interface DebtsProps {
   data: AppData;
@@ -88,200 +90,137 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
     }
   };
 
-  return (
-    <div className="p-4 space-y-4">
-      {/* Header */}
-      <div className="bg-white rounded-lg shadow p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Users className="text-blue-600" /> Reminders
-          </h1>
-          <CurrencySelect
-            value={baseCurrency}
-            onChange={onCurrencyChange}
-            className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:outline-none"
+  const renderList = (list: Debt[], kind: 'receivable' | 'payable') => (
+    <Section
+      title={`${kind === 'receivable' ? 'Receivables' : 'Payables'} (${list.length})`}
+      action={
+        <button
+          onClick={() => openModal(undefined, kind)}
+          className="flex items-center gap-1 text-ios-subhead text-ios-blue active:opacity-60"
+        >
+          <Plus size={16} strokeWidth={2.5} /> Add
+        </button>
+      }
+    >
+      {list.length === 0 ? (
+        <div className="py-6 text-center text-ios-secondary text-ios-subhead">
+          {kind === 'receivable' ? 'Nobody owes you money.' : "You don't owe anybody money!"}
+        </div>
+      ) : (
+        list.map(debt => (
+          <Row
+            key={debt.id}
+            onClick={() => openModal(debt)}
+            title={debt.personName}
+            subtitle={debt.dueDate ? `${debt.description} · Due ${debt.dueDate}` : debt.description}
+            value={
+              <span className={kind === 'receivable' ? 'text-ios-green' : 'text-ios-red'}>
+                {formatCurrencyTrimmed(debt.amount, debt.currency)}
+              </span>
+            }
+            detail={debt.currency !== baseCurrency
+              ? `≈ ${formatCurrency(convertCurrency(debt.amount, debt.currency, baseCurrency), baseCurrency)}`
+              : undefined}
+            accessory={
+              <div className="flex items-center pl-1">
+                <button onClick={() => handleSettle(debt.id)} className={ios.rowAction} title="Mark Settled" aria-label="Mark Settled"><CheckCircle2Icon width={19} height={19} /></button>
+              </div>
+            }
           />
-        </div>
-        <p className="text-sm text-gray-500">
-          This is an isolated reminder board. Debts tracked here do NOT affect your Net Worth.
-        </p>
-      </div>
+        ))
+      )}
+    </Section>
+  );
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
-          <div className="flex items-center gap-2 mb-2 text-sm text-gray-600 font-medium">
-            <ArrowUpRight size={18} className="text-green-500" />
-            Who Owes Me
-          </div>
-          <div className="text-2xl font-bold text-green-600">
-            {formatAdaptiveCurrency(totalReceivables, baseCurrency)}
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 border-l-4 border-red-500">
-          <div className="flex items-center gap-2 mb-2 text-sm text-gray-600 font-medium">
-            <ArrowDownRight size={18} className="text-red-500" />
-            Who I Owe
-          </div>
-          <div className="text-2xl font-bold text-red-600">
-            {formatAdaptiveCurrency(totalPayables, baseCurrency)}
-          </div>
-        </div>
-      </div>
+  return (
+    <div className="px-4 pb-4">
+      <PageTitle title="Reminders">
+        <CurrencySelect
+          value={baseCurrency}
+          onChange={onCurrencyChange}
+          aria-label="View currency"
+          className={ios.pillSelect}
+        />
+      </PageTitle>
+      <p className="px-1 -mt-2 mb-6 text-ios-subhead text-ios-secondary">
+        This is an isolated reminder board. Debts tracked here do NOT affect your Net Worth.
+      </p>
 
-      {/* Receivables Section */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-green-50/30">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            Receivables <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">{receivables.length}</span>
-          </h2>
-          <button 
-            onClick={() => openModal(undefined, 'receivable')}
-            className="text-green-600 hover:text-green-700 bg-green-100 hover:bg-green-200 p-1.5 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
-        
-        {receivables.length === 0 ? (
-          <div className="p-6 text-center text-gray-500 text-sm">Nobody owes you money.</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {receivables.map(debt => (
-              <div key={debt.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-800">{debt.personName}</div>
-                  <div className="text-sm text-gray-500 truncate">{debt.description}</div>
-                  {debt.dueDate && (
-                    <div className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                      <Calendar size={12} /> Due: {debt.dueDate}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end pl-4">
-                  <div className="font-bold text-green-600 whitespace-nowrap">{formatCurrency(debt.amount, debt.currency)}</div>
-                  {debt.currency !== baseCurrency && (
-                    <div className="text-xs text-gray-400 whitespace-nowrap">≈ {formatCurrency(convertCurrency(debt.amount, debt.currency, baseCurrency), baseCurrency)}</div>
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={() => openModal(debt)} className="text-gray-400 hover:text-blue-500"><Edit2 size={16} /></button>
-                    <button onClick={() => handleSettle(debt.id)} className="text-gray-400 hover:text-green-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Payables Section */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-red-50/30">
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            Payables <span className="text-xs font-normal text-gray-500 bg-white px-2 py-0.5 rounded-full border border-gray-200">{payables.length}</span>
-          </h2>
-          <button 
-            onClick={() => openModal(undefined, 'payable')}
-            className="text-red-600 hover:text-red-700 bg-red-100 hover:bg-red-200 p-1.5 rounded-lg transition-colors"
-          >
-            <Plus size={20} />
-          </button>
-        </div>
-        
-        {payables.length === 0 ? (
-          <div className="p-6 text-center text-gray-500 text-sm">You don't owe anybody money!</div>
-        ) : (
-          <div className="divide-y divide-gray-100">
-            {payables.map(debt => (
-              <div key={debt.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-gray-800">{debt.personName}</div>
-                  <div className="text-sm text-gray-500 truncate">{debt.description}</div>
-                  {debt.dueDate && (
-                    <div className="text-xs text-gray-400 flex items-center gap-1 mt-1">
-                      <Calendar size={12} /> Due: {debt.dueDate}
-                    </div>
-                  )}
-                </div>
-                <div className="flex flex-col items-end pl-4">
-                  <div className="font-bold text-red-600 whitespace-nowrap">{formatCurrency(debt.amount, debt.currency)}</div>
-                  {debt.currency !== baseCurrency && (
-                    <div className="text-xs text-gray-400 whitespace-nowrap">≈ {formatCurrency(convertCurrency(debt.amount, debt.currency, baseCurrency), baseCurrency)}</div>
-                  )}
-                  <div className="flex gap-2 mt-2">
-                    <button onClick={() => openModal(debt)} className="text-gray-400 hover:text-blue-500"><Edit2 size={16} /></button>
-                    <button onClick={() => handleSettle(debt.id)} className="text-gray-400 hover:text-red-500" title="Mark Settled"><CheckCircle2Icon size={16} /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-gray-800">
-                {editingDebt ? 'Edit Reminder' : 'Add Reminder'}
-              </h2>
-              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700 text-2xl font-light">&times;</button>
+      <div className="space-y-6">
+        {/* Summary tiles */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className={`${ios.card} p-4`}>
+            <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-green">
+              <ArrowUpRight size={16} strokeWidth={2.5} /> Who Owes Me
             </div>
-            
-            <form onSubmit={handleSave} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setType('receivable')}
-                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${type === 'receivable' ? 'bg-green-50 border-green-500 text-green-700' : 'bg-white border-gray-300 text-gray-600'}`}
-                  >
-                    They Owe Me
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setType('payable')}
-                    className={`py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${type === 'payable' ? 'bg-red-50 border-red-500 text-red-700' : 'bg-white border-gray-300 text-gray-600'}`}
-                  >
-                    I Owe Them
-                  </button>
-                </div>
-              </div>
+            <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
+              {formatAdaptiveCurrency(totalReceivables, baseCurrency)}
+            </div>
+          </div>
+          <div className={`${ios.card} p-4`}>
+            <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-red">
+              <ArrowDownRight size={16} strokeWidth={2.5} /> Who I Owe
+            </div>
+            <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
+              {formatAdaptiveCurrency(totalPayables, baseCurrency)}
+            </div>
+          </div>
+        </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Person's Name</label>
-                <input
-                  type="text"
-                  required
-                  value={personName}
-                  onChange={e => setPersonName(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. John Doe"
-                />
-              </div>
+        {renderList(receivables, 'receivable')}
+        {renderList(payables, 'payable')}
+      </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description / Reason</label>
-                <input
-                  type="text"
-                  required
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                  placeholder="e.g. Dinner on Friday"
-                />
-              </div>
+      {/* Add/Edit sheet (iOS modal sheet: Cancel · Title · Save) */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={closeModal}>
+          <form
+            onSubmit={handleSave}
+            onClick={e => e.stopPropagation()}
+            className="bg-ios-bg w-full max-w-md max-h-[90vh] overflow-y-auto rounded-t-ios sm:rounded-ios pb-8"
+          >
+            <div className="sticky top-0 ios-material flex items-center justify-between px-4 h-14 rounded-t-ios">
+              <button type="button" onClick={closeModal} className="text-ios-body text-ios-blue active:opacity-60">Cancel</button>
+              <h2 className="text-ios-headline">{editingDebt ? 'Edit Reminder' : 'Add Reminder'}</h2>
+              <button type="submit" className="text-ios-headline text-ios-blue active:opacity-60">{editingDebt ? 'Save' : 'Add'}</button>
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
+            <div className="px-4 pt-2 space-y-5">
+              <Segmented
+                value={type}
+                onChange={setType}
+                options={[
+                  { value: 'receivable', label: 'They Owe Me' },
+                  { value: 'payable', label: 'I Owe Them' },
+                ]}
+              />
+
+              <div className={`${ios.card} p-4 space-y-4`}>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <DollarSign size={16} className="text-gray-400" />
-                    </div>
+                  <label className={ios.label}>Person's Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={personName}
+                    onChange={e => setPersonName(e.target.value)}
+                    className={ios.input}
+                    placeholder="e.g. John Doe"
+                  />
+                </div>
+                <div>
+                  <label className={ios.label}>Description / Reason</label>
+                  <input
+                    type="text"
+                    required
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    className={ios.input}
+                    placeholder="e.g. Dinner on Friday"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={ios.label}>Amount</label>
                     <input
                       type="number"
                       required
@@ -289,47 +228,27 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
                       step="0.01"
                       value={amount}
                       onChange={e => setAmount(e.target.value)}
-                      className="w-full pl-9 p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                      className={ios.input}
+                      placeholder="0.00"
                     />
+                  </div>
+                  <div>
+                    <label className={ios.label}>Currency</label>
+                    <CurrencySelect value={currency} onChange={setCurrency} className={ios.select} />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                  <CurrencySelect
-                    value={currency}
-                    onChange={setCurrency}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  <label className={ios.label}>Due Date (Optional)</label>
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={e => setDueDate(e.target.value)}
+                    className={ios.input}
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Due Date (Optional)</label>
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={e => setDueDate(e.target.value)}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
-              </div>
-
-              <div className="pt-4 flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 bg-gray-100 text-gray-700 py-2 rounded font-medium hover:bg-gray-200 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white py-2 rounded font-medium hover:bg-blue-700 transition-colors"
-                >
-                  {editingDebt ? 'Save Changes' : 'Add Reminder'}
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       )}
     </div>

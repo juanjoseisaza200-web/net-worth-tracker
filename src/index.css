@@ -2,17 +2,102 @@
 @tailwind components;
 @tailwind utilities;
 
+/* iOS system colors (light), per Apple's Human Interface Guidelines. */
+:root {
+  color-scheme: light;
+  --ios-bg: #f2f2f7;          /* systemGroupedBackground */
+  --ios-card: #ffffff;        /* secondarySystemGroupedBackground */
+  --ios-fill: rgba(118, 118, 128, 0.12);
+  --ios-label: #000000;
+  --ios-secondary: rgba(60, 60, 67, 0.6);
+  --ios-tertiary: rgba(60, 60, 67, 0.3);
+  --ios-separator: rgba(60, 60, 67, 0.29);
+  --ios-bar: rgba(249, 249, 249, 0.72);
+  --ios-segment: #ffffff;     /* selected segment of a UISegmentedControl */
+  --ios-blue: #007aff;
+  --ios-green: #34c759;
+  --ios-red: #ff3b30;
+  --ios-orange: #ff9500;
+  --ios-purple: #af52de;
+  --ios-indigo: #5856d6;
+  --ios-teal: #30b0c7;
+  --ios-yellow: #ffcc00;
+  --ios-gray: #8e8e93;
+}
+
+/* Dark palette: forced by the Appearance setting (data-theme="dark"), or
+   following the system unless the user forced light. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ios-bg: #000000;
+  --ios-card: #1c1c1e;
+  --ios-fill: rgba(118, 118, 128, 0.24);
+  --ios-label: #ffffff;
+  --ios-secondary: rgba(235, 235, 245, 0.6);
+  --ios-tertiary: rgba(235, 235, 245, 0.3);
+  --ios-separator: rgba(84, 84, 88, 0.65);
+  --ios-bar: rgba(30, 30, 30, 0.72);
+  --ios-segment: #636366;
+  --ios-blue: #0a84ff;
+  --ios-green: #30d158;
+  --ios-red: #ff453a;
+  --ios-orange: #ff9f0a;
+  --ios-purple: #bf5af2;
+  --ios-indigo: #5e5ce6;
+  --ios-teal: #40c8e0;
+  --ios-yellow: #ffd60a;
+  --ios-gray: #8e8e93;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ios-bg: #000000;
+    --ios-card: #1c1c1e;
+    --ios-fill: rgba(118, 118, 128, 0.24);
+    --ios-label: #ffffff;
+    --ios-secondary: rgba(235, 235, 245, 0.6);
+    --ios-tertiary: rgba(235, 235, 245, 0.3);
+    --ios-separator: rgba(84, 84, 88, 0.65);
+    --ios-bar: rgba(30, 30, 30, 0.72);
+    --ios-segment: #636366;
+  --ios-segment: #636366;
+    --ios-blue: #0a84ff;
+    --ios-green: #30d158;
+    --ios-red: #ff453a;
+    --ios-orange: #ff9f0a;
+    --ios-purple: #bf5af2;
+    --ios-indigo: #5e5ce6;
+    --ios-teal: #40c8e0;
+    --ios-yellow: #ffd60a;
+    --ios-gray: #8e8e93;
+  }
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Roboto',
+    'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #f3f4f6;
+  -webkit-tap-highlight-color: transparent;
+  background-color: var(--ios-bg);
+  color: var(--ios-label);
 }
 
 #root {
   min-height: 100vh;
 }
 
+/* Frosted bar material used by the top bar and the floating tab bar. */
+.ios-material {
+  background-color: var(--ios-bar);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Hairline separator between rows, drawn on the row's text column so it is
+   inset past the leading icon, like UITableView. */
+.ios-row + .ios-row .ios-row-content {
+  border-top: 0.5px solid var(--ios-separator);
+}

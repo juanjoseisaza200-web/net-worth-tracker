@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { Plus, Trash2, Edit2, TrendingUp, Coins, BarChart3, DollarSign, Building2 } from 'lucide-react';
-import { AppData, Stock, Crypto, FixedIncome, VariableInvestment, Currency } from '../types';
+import { useState, useEffect, useRef, ReactNode } from 'react';
+import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent } from 'lucide-react';
+import { AppData, Stock, Crypto, FixedIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
 import AutocompleteInput, { Suggestion } from './AutocompleteInput';
@@ -9,6 +9,8 @@ import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
+import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
+import { ios } from './iosStyles';
 
 interface InvestmentsProps {
   data: AppData;
@@ -18,12 +20,34 @@ interface InvestmentsProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'variable';
+type InvestmentType = 'stock' | 'crypto' | 'fixed';
+
+const TABS: { value: InvestmentType; label: string }[] = [
+  { value: 'stock', label: 'Stocks' },
+  { value: 'crypto', label: 'Crypto' },
+  { value: 'fixed', label: 'Fixed' },
+];
+
+// The form's two-way input-mode toggles keep their own buttons (each carries
+// conversion logic), styled to match the Segmented control in ios.tsx.
+const segmentTrack = 'flex p-[2px] rounded-[9px] bg-ios-fill';
+const segmentButton = (active: boolean) =>
+  `flex-1 min-h-[30px] px-2 rounded-[7px] text-ios-footnote font-semibold text-ios-label transition-colors ${active ? 'bg-ios-segment shadow-[0_3px_8px_rgba(0,0,0,0.12),0_3px_1px_rgba(0,0,0,0.04)]' : ''}`;
+
+/** Small tinted capsule next to a holding's name (e.g. "grows daily"). */
+const badge = 'inline-block align-middle px-2 py-px rounded-full bg-ios-fill text-ios-caption font-normal';
 
 export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Rows are tapped far down the list, but the edit form renders above it:
+  // bring the form into view whenever an item is opened for editing.
+  useEffect(() => {
+    if (editingItem) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [editingItem]);
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [priceUpdateTime, setPriceUpdateTime] = useState<Date | null>(null);
 
@@ -62,13 +86,6 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     linkedAccountId: '',
   });
 
-  const [variableForm, setVariableForm] = useState({
-    name: '',
-    amount: '',
-    currentValue: '',
-    currency: 'USD' as Currency,
-  });
-
   const handleStockSelect = async (suggestion: Suggestion) => {
     setStockForm(prev => ({ ...prev, symbol: suggestion.symbol }));
     setIsFetchingPrice(true);
@@ -93,7 +110,6 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
     setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
     setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'USD', linkedAccountId: '' });
-    setVariableForm({ name: '', amount: '', currentValue: '', currency: 'USD' });
     setEditingItem(null);
     setShowForm(false);
   };
@@ -299,52 +315,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     resetForms();
   };
 
-  const handleVariableSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const amount = parseAmount(variableForm.amount);
-    if (amount === null || amount <= 0) {
-      alert('Please enter a valid amount greater than 0.');
-      return;
-    }
-    const currentValue = parseAmount(variableForm.currentValue);
-
-    if (editingItem && editingItem.type === 'variable') {
-      const updatedList = data.variableInvestments.map(v => {
-        if (v.id === editingItem.id) {
-          const updated: VariableInvestment = {
-            ...v,
-            name: variableForm.name,
-            amount,
-            currency: variableForm.currency,
-          };
-          if (currentValue !== null) {
-            updated.currentValue = currentValue;
-          } else {
-            delete updated.currentValue;
-          }
-          return updated;
-        }
-        return v;
-      });
-      setData({ ...data, variableInvestments: updatedList });
-    } else {
-      const newVariable: VariableInvestment = {
-        id: Date.now().toString(),
-        name: variableForm.name,
-        amount,
-        currency: variableForm.currency,
-        type: 'other',
-      };
-      if (currentValue !== null) {
-        newVariable.currentValue = currentValue;
-      }
-      setData({ ...data, variableInvestments: [...data.variableInvestments, newVariable] });
-    }
-    resetForms();
-  };
-
-  const handleEdit = (type: InvestmentType, item: Stock | Crypto | FixedIncome | VariableInvestment) => {
+  const handleEdit = (type: InvestmentType, item: Stock | Crypto | FixedIncome) => {
     setEditingItem({ type, id: item.id });
     setShowForm(true);
     setActiveTab(type);
@@ -371,7 +342,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         inputMode: 'coins',
         moneyAmount: (c.amount * c.purchasePrice).toFixed(2),
       });
-    } else if (type === 'fixed') {
+    } else {
       const f = item as FixedIncome;
       setFixedForm({
         name: f.name,
@@ -380,14 +351,6 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         maturityDate: f.maturityDate || '',
         currency: f.currency,
         linkedAccountId: f.linkedAccountId || '',
-      });
-    } else {
-      const v = item as VariableInvestment;
-      setVariableForm({
-        name: v.name,
-        amount: v.amount.toString(),
-        currentValue: v.currentValue?.toString() || '',
-        currency: v.currency,
       });
     }
   };
@@ -398,10 +361,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         setData({ ...data, stocks: data.stocks.filter(s => s.id !== id) });
       } else if (type === 'crypto') {
         setData({ ...data, crypto: data.crypto.filter(c => c.id !== id) });
-      } else if (type === 'fixed') {
-        setData({ ...data, fixedIncome: data.fixedIncome.filter(f => f.id !== id) });
       } else {
-        setData({ ...data, variableInvestments: data.variableInvestments.filter(v => v.id !== id) });
+        setData({ ...data, fixedIncome: data.fixedIncome.filter(f => f.id !== id) });
       }
     }
   };
@@ -535,12 +496,12 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     const isPositive = pnl >= 0;
 
     return (
-      <div className={`mt-2 text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'} flex items-center gap-1`}>
-        {isPositive ? <TrendingUp size={16} /> : <TrendingUp size={16} className="transform rotate-180" />}
+      <div className={`mt-1.5 px-1 text-ios-footnote font-semibold tabular-nums ${isPositive ? 'text-ios-green' : 'text-ios-red'} flex items-center gap-1 flex-wrap`}>
+        {isPositive ? <TrendingUp size={14} /> : <TrendingUp size={14} className="transform rotate-180" />}
         <span>
           {isPositive ? '+' : ''}{formatCurrency(pnl, stockForm.currency)} ({isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%)
         </span>
-        <span className="text-gray-400 font-normal ml-1">
+        <span className="text-ios-secondary font-normal">
           (Est. Value: {formatCurrency(value, stockForm.currency)})
         </span>
       </div>
@@ -552,13 +513,13 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     if (activeTab === 'stock') {
       return (
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <h2 className="text-lg font-semibold mb-4">
+        <div className={`${ios.card} p-4`}>
+          <h2 className="text-ios-title3 font-semibold mb-4 px-1">
             {editingItem ? 'Edit Stock' : 'Add Stock'}
           </h2>
           <form onSubmit={handleStockSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+              <label className={ios.label}>Symbol</label>
               <AutocompleteInput
                 value={stockForm.symbol}
                 onChange={(value) => setStockForm({ ...stockForm, symbol: value })}
@@ -570,8 +531,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             </div>
             {/* Input Mode Toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Input Method</label>
-              <div className="flex gap-2">
+              <label className={ios.label}>Input Method</label>
+              <div className={segmentTrack}>
                 <button
                   type="button"
                   onClick={() => {
@@ -586,10 +547,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     }
                     setStockForm({ ...stockForm, inputMode: 'shares', shares: newShares });
                   }}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'shares'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={segmentButton(stockForm.inputMode === 'shares')}
                 >
                   By Shares
                 </button>
@@ -607,20 +565,17 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     }
                     setStockForm({ ...stockForm, inputMode: 'money', moneyAmount: newMoneyAmount });
                   }}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${stockForm.inputMode === 'money'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={segmentButton(stockForm.inputMode === 'money')}
                 >
                   By Money Amount
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {stockForm.inputMode === 'shares' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Shares</label>
+                  <label className={ios.label}>Shares</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -634,13 +589,13 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                         setStockForm({ ...stockForm, shares: val });
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className={ios.input}
                     placeholder="0.4"
                   />
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
+                  <label className={ios.label}>Money Amount</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -654,29 +609,29 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                         setStockForm({ ...stockForm, moneyAmount: val });
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className={ios.input}
                     placeholder="30.00"
                   />
                   {stockForm.moneyAmount && stockForm.purchasePrice && parseFloat(stockForm.purchasePrice) > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className={`${ios.hint} tabular-nums`}>
                       ≈ {(Math.round((parseFloat(stockForm.moneyAmount) / parseFloat(stockForm.purchasePrice)) * 100) / 100).toFixed(2)} shares
                     </div>
                   )}
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <label className={ios.label}>Currency</label>
                 <CurrencySelect
                   value={stockForm.currency}
                   onChange={(c) => setStockForm({ ...stockForm, currency: c })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.select}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Purchase Price {stockForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
+                <label className={ios.label}>
+                  Purchase Price {stockForm.inputMode === 'money' && <span className="text-ios-caption2 text-ios-tertiary">(required for calculation)</span>}
                 </label>
                 <input
                   type="text"
@@ -691,14 +646,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       setStockForm({ ...stockForm, purchasePrice: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                   placeholder="Price per share"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                <label className={`${ios.label} flex justify-between gap-1`}>
                   <span>Current Price (optional)</span>
-                  {isFetchingPrice && <span className="text-blue-600 animate-pulse text-xs">Fetching price...</span>}
+                  {isFetchingPrice && <span className="text-ios-blue animate-pulse text-ios-caption2">Fetching price...</span>}
                 </label>
                 <input
                   type="text"
@@ -712,16 +667,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       setStockForm({ ...stockForm, currentPrice: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                 />
                 {renderEstimatedPnL(stockForm.shares, stockForm.purchasePrice, stockForm.currentPrice)}
               </div>
             </div>
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                {editingItem ? 'Update' : 'Add'} Stock
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                {editingItem ? 'Save' : 'Add'}
               </button>
-              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
                 Cancel
               </button>
             </div>
@@ -732,13 +687,13 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     if (activeTab === 'crypto') {
       return (
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <h2 className="text-lg font-semibold mb-4">
+        <div className={`${ios.card} p-4`}>
+          <h2 className="text-ios-title3 font-semibold mb-4 px-1">
             {editingItem ? 'Edit Crypto' : 'Add Crypto'}
           </h2>
           <form onSubmit={handleCryptoSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Symbol</label>
+              <label className={ios.label}>Symbol</label>
               <AutocompleteInput
                 value={cryptoForm.symbol}
                 onChange={(value) => setCryptoForm({ ...cryptoForm, symbol: value })}
@@ -750,8 +705,8 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             </div>
             {/* Input Mode Toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Input Method</label>
-              <div className="flex gap-2">
+              <label className={ios.label}>Input Method</label>
+              <div className={segmentTrack}>
                 <button
                   type="button"
                   onClick={() => {
@@ -766,10 +721,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     }
                     setCryptoForm({ ...cryptoForm, inputMode: 'coins', amount: newAmount });
                   }}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'coins'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={segmentButton(cryptoForm.inputMode === 'coins')}
                 >
                   By Coins
                 </button>
@@ -787,20 +739,17 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     }
                     setCryptoForm({ ...cryptoForm, inputMode: 'money', moneyAmount: newMoneyAmount });
                   }}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${cryptoForm.inputMode === 'money'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                  className={segmentButton(cryptoForm.inputMode === 'money')}
                 >
                   By Money Amount
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               {cryptoForm.inputMode === 'coins' ? (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount (Coins)</label>
+                  <label className={ios.label}>Amount (Coins)</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -814,13 +763,13 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                         setCryptoForm({ ...cryptoForm, amount: val });
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className={ios.input}
                     placeholder="0.5"
                   />
                 </div>
               ) : (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Money Amount</label>
+                  <label className={ios.label}>Money Amount</label>
                   <input
                     type="text"
                     inputMode="decimal"
@@ -834,29 +783,29 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                         setCryptoForm({ ...cryptoForm, moneyAmount: val });
                       }
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className={ios.input}
                     placeholder="30.00"
                   />
                   {cryptoForm.moneyAmount && cryptoForm.purchasePrice && parseFloat(cryptoForm.purchasePrice) > 0 && (
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className={`${ios.hint} tabular-nums`}>
                       ≈ {(Math.round((parseFloat(cryptoForm.moneyAmount) / parseFloat(cryptoForm.purchasePrice)) * 100000000) / 100000000).toFixed(8)} coins
                     </div>
                   )}
                 </div>
               )}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <label className={ios.label}>Currency</label>
                 <CurrencySelect
                   value={cryptoForm.currency}
                   onChange={(c) => setCryptoForm({ ...cryptoForm, currency: c })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.select}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Purchase Price {cryptoForm.inputMode === 'money' && <span className="text-xs text-gray-500">(required for calculation)</span>}
+                <label className={ios.label}>
+                  Purchase Price {cryptoForm.inputMode === 'money' && <span className="text-ios-caption2 text-ios-tertiary">(required for calculation)</span>}
                 </label>
                 <input
                   type="text"
@@ -871,14 +820,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       setCryptoForm({ ...cryptoForm, purchasePrice: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                   placeholder="Price per coin"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                <label className={`${ios.label} flex justify-between gap-1`}>
                   <span>Current Price (optional)</span>
-                  {isFetchingPrice && <span className="text-blue-600 animate-pulse text-xs">Fetching price...</span>}
+                  {isFetchingPrice && <span className="text-ios-blue animate-pulse text-ios-caption2">Fetching price...</span>}
                 </label>
                 <input
                   type="text"
@@ -892,16 +841,16 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       setCryptoForm({ ...cryptoForm, currentPrice: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                 />
                 {renderEstimatedPnL(cryptoForm.amount, cryptoForm.purchasePrice, cryptoForm.currentPrice)}
               </div>
             </div>
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                {editingItem ? 'Update' : 'Add'} Crypto
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                {editingItem ? 'Save' : 'Add'}
               </button>
-              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
                 Cancel
               </button>
             </div>
@@ -912,41 +861,41 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
     if (activeTab === 'fixed') {
       return (
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <h2 className="text-lg font-semibold mb-4">
+        <div className={`${ios.card} p-4`}>
+          <h2 className="text-ios-title3 font-semibold mb-4 px-1">
             {editingItem ? 'Edit Fixed Income' : 'Add Fixed Income'}
           </h2>
           <form onSubmit={handleFixedSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Link to Cash Account (Optional)</label>
+              <label className={ios.label}>Link to Cash Account (Optional)</label>
               <select
                 value={fixedForm.linkedAccountId}
                 onChange={(e) => setFixedForm({ ...fixedForm, linkedAccountId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-blue-500"
+                className={ios.select}
               >
                 <option value="">No link (Manual Entry)</option>
                 {data.accounts?.map(acc => (
                   <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500 mt-1">If linked, the balance will automatically mirror your cash account.</p>
+              <p className={ios.hint}>If linked, the balance will automatically mirror your cash account.</p>
             </div>
             {!fixedForm.linkedAccountId && (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className={ios.label}>Name</label>
                   <input
                     type="text"
                     required
                     value={fixedForm.name}
                     onChange={(e) => setFixedForm({ ...fixedForm, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    className={ios.input}
                     placeholder="Savings Account, Bond, etc."
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                    <label className={ios.label}>Amount</label>
                     <input
                       type="text"
                       inputMode="decimal"
@@ -959,23 +908,23 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                           setFixedForm({ ...fixedForm, amount: val });
                         }
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className={ios.input}
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                    <label className={ios.label}>Currency</label>
                     <CurrencySelect
                       value={fixedForm.currency}
                       onChange={(c) => setFixedForm({ ...fixedForm, currency: c })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className={ios.select}
                     />
                   </div>
                 </div>
               </>
             )}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Interest Rate (%)</label>
+                <label className={ios.label}>Interest Rate (%)</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -989,24 +938,24 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       setFixedForm({ ...fixedForm, interestRate: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Maturity Date (optional)</label>
+                <label className={ios.label}>Maturity Date (optional)</label>
                 <input
                   type="date"
                   value={fixedForm.maturityDate}
                   onChange={(e) => setFixedForm({ ...fixedForm, maturityDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className={ios.input}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                {editingItem ? 'Update' : 'Add'} Fixed Income
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                {editingItem ? 'Save' : 'Add'}
               </button>
-              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
                 Cancel
               </button>
             </div>
@@ -1015,84 +964,37 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       );
     }
 
-    return (
-      <div className="bg-white rounded-lg shadow p-4 mb-4">
-        <h2 className="text-lg font-semibold mb-4">
-          {editingItem ? 'Edit Variable Investment' : 'Add Variable Investment'}
-        </h2>
-        <form onSubmit={handleVariableSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-            <input
-              type="text"
-              required
-              value={variableForm.name}
-              onChange={(e) => setVariableForm({ ...variableForm, name: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              placeholder="Real Estate, Commodities, etc."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Initial Amount</label>
-              <input
-                type="text"
-                inputMode="decimal"
-
-                lang="en-US"
-                required
-                value={variableForm.amount}
-                onChange={(e) => {
-                  const val = e.target.value.replace(',', '.');
-                  if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                    setVariableForm({ ...variableForm, amount: val });
-                  }
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-              <CurrencySelect
-                value={variableForm.currency}
-                onChange={(c) => setVariableForm({ ...variableForm, currency: c })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Current Value (optional)</label>
-            <input
-              type="text"
-              inputMode="decimal"
-
-              lang="en-US"
-              value={variableForm.currentValue}
-              onChange={(e) => {
-                const val = e.target.value.replace(',', '.');
-                if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                  setVariableForm({ ...variableForm, currentValue: val });
-                }
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-              {editingItem ? 'Update' : 'Add'} Investment
-            </button>
-            <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    );
+    return null;
   };
+
+  // Delete control at the trailing edge of every holding row (tapping the row edits).
+  const rowActions = (type: InvestmentType, item: Stock | Crypto | FixedIncome) => (
+    <div className="flex items-center gap-2 shrink-0 ml-1">
+      <button onClick={() => handleDelete(type, item.id)} className={ios.rowActionDestructive} aria-label="Delete">
+        <Trash2 size={18} />
+      </button>
+    </div>
+  );
+
+  // Headline for the active tab: label, big rounded total, and a detail line.
+  const renderSummary = (label: string, icon: typeof LineChartIcon, color: string, total: number, detail: ReactNode) => (
+    <div className="px-1">
+      <div className="flex items-center gap-2 text-ios-subhead font-semibold text-ios-secondary">
+        <IconSquare icon={icon} color={color} />
+        {label}
+      </div>
+      <div className="mt-2 font-rounded text-[40px] leading-[48px] font-bold tabular-nums tracking-tight truncate">
+        {formatCompactCurrency(total, baseCurrency)}
+      </div>
+      <div className="mt-0.5 flex flex-wrap items-center justify-between gap-x-3 text-ios-subhead">
+        {detail}
+      </div>
+    </div>
+  );
 
   return (
     <div
-      className="p-4 space-y-4 pb-24 relative min-h-screen touch-pan-y"
+      className="px-4 pb-4 relative min-h-screen touch-pan-y"
       style={{ paddingTop: '1px' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
@@ -1104,92 +1006,41 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           className="absolute left-0 right-0 flex justify-center items-center z-10 transition-transform duration-200"
           style={{ top: isRefreshing ? '20px' : `${Math.min(pullDistance / 2, 40)}px` }}
         >
-          <div className="bg-white rounded-full p-2 shadow-md flex items-center gap-2">
-            <div className={`w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full ${isRefreshing || pullDistance > PULL_THRESHOLD ? 'animate-spin' : ''}`} />
-            <span className="text-xs font-medium text-blue-600">
+          <div className="ios-material rounded-full pl-2.5 pr-3.5 py-2 shadow-lg flex items-center gap-2">
+            <div className={`w-4 h-4 border-2 border-ios-blue border-t-transparent rounded-full ${isRefreshing || pullDistance > PULL_THRESHOLD ? 'animate-spin' : ''}`} />
+            <span className="text-ios-footnote font-semibold text-ios-blue">
               {isRefreshing ? 'Updating Prices...' : pullDistance > PULL_THRESHOLD ? 'Release to Refresh' : 'Pull to Refresh'}
             </span>
           </div>
         </div>
       )}
 
-      {/* Header with Currency Selector */}
       <div
-        className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
+        className="transition-transform duration-200 space-y-6"
         style={{ transform: `translateY(${pullDistance}px)` }}
       >
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-bold text-gray-800">Investments</h1>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-gray-600">Currency:</label>
+        <div>
+          <PageTitle title="Investments">
             <CurrencySelect
               value={baseCurrency}
               onChange={onCurrencyChange}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
+              aria-label="View currency"
+              className={ios.pillSelect}
             />
-          </div>
+          </PageTitle>
+
+          {/* Tabs */}
+          <Segmented
+            options={TABS}
+            value={activeTab}
+            onChange={(id) => {
+              setActiveTab(id);
+              if (!showForm) setShowForm(false);
+            }}
+          />
         </div>
 
-
-
-        {/* Tabs */}
-        <div
-          className="bg-white rounded-lg shadow overflow-hidden transition-transform duration-200 mb-4"
-          style={{ transform: `translateY(${pullDistance}px)` }}
-        >
-          <div className="flex border-b border-gray-200">
-            {[
-              { id: 'stock' as InvestmentType, label: 'Stocks', icon: TrendingUp },
-              { id: 'crypto' as InvestmentType, label: 'Crypto', icon: Coins },
-              { id: 'fixed' as InvestmentType, label: 'Fixed', icon: DollarSign },
-              { id: 'variable' as InvestmentType, label: 'Variable', icon: BarChart3 },
-            ].map(tab => {
-              const Icon = tab.icon;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    if (!showForm) setShowForm(false);
-                  }}
-                  className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                    : 'text-gray-600 hover:bg-gray-50'
-                    }`}
-                >
-                  <Icon size={20} />
-                  <span className="text-xs font-medium">{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Add Button */}
-        {!showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg transition-transform duration-200 mb-4"
-            style={{ transform: `translateY(${pullDistance}px)` }}
-          >
-            <Plus size={20} />
-            Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investment'}
-          </button>
-        )}
-
-        {/* Form */}
-        {renderForm()}
-
-        {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
-
-
-        {priceUpdateTime && (
-          <div className="text-xs text-gray-500 text-center">
-            Last updated: {priceUpdateTime.toLocaleTimeString()}
-          </div>
-        )}
-
-        {/* Summary Cards */}
+        {/* Summary */}
         {activeTab === 'stock' && data.stocks.length > 0 && (() => {
           const totalCurrentValue = data.stocks.reduce((sum, stock) => {
             const currentPrice = stock.currentPrice || stock.purchasePrice;
@@ -1203,27 +1054,15 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           const totalGainLoss = totalCurrentValue - totalInvested;
           const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
-          return (
-            <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
-              style={{ transform: `translateY(${pullDistance}px)` }}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Total Stocks Value</span>
-                <TrendingUp size={20} className="text-blue-500" />
-              </div>
-              <div className="text-2xl font-bold text-blue-600 mb-2">
-                {formatCompactCurrency(totalCurrentValue, baseCurrency)}
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
-                <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
-                  ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
-                </span>
-              </div>
-            </div>
-          );
+          return renderSummary('Total Stocks Value', LineChartIcon, 'var(--ios-blue)', totalCurrentValue, (
+            <>
+              <span className="text-ios-secondary tabular-nums">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
+              <span className={`font-semibold tabular-nums shrink-0 ${totalGainLoss >= 0 ? 'text-ios-green' : 'text-ios-red'}`}>
+                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
+                {' '}({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+              </span>
+            </>
+          ));
         })()}
 
         {activeTab === 'crypto' && data.crypto.length > 0 && (() => {
@@ -1239,27 +1078,15 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           const totalGainLoss = totalCurrentValue - totalInvested;
           const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
-          return (
-            <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
-              style={{ transform: `translateY(${pullDistance}px)` }}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Total Crypto Value</span>
-                <Coins size={20} className="text-purple-500" />
-              </div>
-              <div className="text-2xl font-bold text-purple-600 mb-2">
-                {formatCompactCurrency(totalCurrentValue, baseCurrency)}
-              </div>
-              <div className="flex justify-between items-center text-sm">
-                <span className="text-gray-500">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
-                <span className={`font-semibold ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
-                  ({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
-                </span>
-              </div>
-            </div>
-          );
+          return renderSummary('Total Crypto Value', Bitcoin, 'var(--ios-purple)', totalCurrentValue, (
+            <>
+              <span className="text-ios-secondary tabular-nums">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
+              <span className={`font-semibold tabular-nums shrink-0 ${totalGainLoss >= 0 ? 'text-ios-green' : 'text-ios-red'}`}>
+                {totalGainLoss >= 0 ? '+' : ''}{formatCompactCurrency(totalGainLoss, baseCurrency)}
+                {' '}({totalGainLossPercent >= 0 ? '+' : ''}{totalGainLossPercent.toFixed(2)}%)
+              </span>
+            </>
+          ));
         })()}
 
         {activeTab === 'fixed' && data.fixedIncome.length > 0 && (() => {
@@ -1276,67 +1103,43 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
             return sum + convertCurrency(amount, currency, baseCurrency);
           }, 0);
 
-          return (
-            <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
-              style={{ transform: `translateY(${pullDistance}px)` }}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Total Fixed Income Value</span>
-                <DollarSign size={20} className="text-green-500" />
-              </div>
-              <div className="text-2xl font-bold text-green-600">
-                {formatCompactCurrency(totalValue, baseCurrency)}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">
-                {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-          );
+          return renderSummary('Total Fixed Income Value', Percent, 'var(--ios-green)', totalValue, (
+            <span className="text-ios-secondary">
+              {data.fixedIncome.length} investment{data.fixedIncome.length !== 1 ? 's' : ''}
+            </span>
+          ));
         })()}
 
-        {activeTab === 'variable' && data.variableInvestments.length > 0 && (() => {
-          const totalValue = data.variableInvestments.reduce((sum, inv) => {
-            const value = inv.currentValue || inv.amount;
-            return sum + convertCurrency(value, inv.currency, baseCurrency);
-          }, 0);
+        {/* Add Button */}
+        {!showForm && (
+          <button
+            onClick={() => setShowForm(true)}
+            className={`${ios.buttonPrimary} w-full`}
+          >
+            <Plus size={20} strokeWidth={2.5} />
+            Add {activeTab === 'stock' ? 'Stock' : activeTab === 'crypto' ? 'Crypto' : 'Fixed Income'}
+          </button>
+        )}
 
-          return (
-            <div
-              className="bg-white rounded-lg shadow p-4 transition-transform duration-200 mb-4"
-              style={{ transform: `translateY(${pullDistance}px)` }}
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-gray-600">Total Variable Investments Value</span>
-                <BarChart3 size={20} className="text-yellow-500" />
-              </div>
-              <div className="text-2xl font-bold text-yellow-600">
-                {formatCompactCurrency(totalValue, baseCurrency)}
-              </div>
-              <div className="text-sm text-gray-500 mt-1">
-                {data.variableInvestments.length} investment{data.variableInvestments.length !== 1 ? 's' : ''}
-              </div>
-            </div>
-          );
-        })()}
+        {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
+        <div ref={formRef} className="scroll-mt-16 empty:hidden">
+          {renderForm()}
+        </div>
+
+        {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
 
         {/* List */}
-        <div
-          className="bg-white rounded-lg shadow transition-transform duration-200 mb-4"
-          style={{ transform: `translateY(${pullDistance}px)` }}
+        <Section
+          title={activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : 'Fixed Income'}
+          footer={priceUpdateTime && `Last updated: ${priceUpdateTime.toLocaleTimeString()}`}
         >
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : activeTab === 'fixed' ? 'Fixed Income' : 'Variable Investments'}
-            </h2>
-          </div>
           {(() => {
             if (activeTab === 'stock') {
               if (data.stocks.length === 0) {
-                return <div className="p-8 text-center text-gray-500">No stocks added yet</div>;
+                return <div className="p-8 text-center text-ios-secondary">No stocks added yet</div>;
               }
               return (
-                <div className="divide-y divide-gray-100">
+                <>
                   {[...data.stocks]
                     .sort((a, b) => {
                       const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
@@ -1354,65 +1157,44 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                       const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
                       const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
-                      const convertedPurchaseValue = convertCurrency(purchaseValue, stock.currency, baseCurrency);
                       const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
+                      const hasCurrent = stock.currentPrice && stock.currentPrice !== stock.purchasePrice;
 
                       return (
-                        <div key={stock.id} className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 min-w-0 mr-2">
-                              <div className="font-semibold text-lg text-gray-800 truncate">{stock.symbol}</div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                {stock.shares.toFixed(2)} shares @ {formatCurrency(stock.purchasePrice, stock.currency)}
+                        <Row
+                          key={stock.id}
+                          title={<span className="font-semibold">{stock.symbol}</span>}
+                          subtitle={
+                            <>
+                              <div className="truncate tabular-nums">
+                                {stock.shares.toFixed(2)} sh @ {formatCurrency(stock.purchasePrice, stock.currency)}
                               </div>
-                              {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
-                                <div className="text-sm text-gray-500">
-                                  Current: {formatCurrency(stock.currentPrice, stock.currency)}
+                              {hasCurrent && (
+                                <div className="truncate tabular-nums">
+                                  Now {formatCurrency(stock.currentPrice!, stock.currency)}
                                 </div>
                               )}
-                              <div className="text-lg font-bold text-blue-600 mt-2">
-                                {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
-                              </div>
-                              {stock.currentPrice && stock.currentPrice !== stock.purchasePrice && (
-                                <div className="mt-2 space-y-1">
-                                  <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
-                                    ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEdit('stock', stock)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDelete('stock', stock.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
-                          </div>
-                        </div>
+                            </>
+                          }
+                          value={<span className="font-semibold">{formatCompactCurrency(convertedCurrentValue, baseCurrency)}</span>}
+                          detail={hasCurrent && (
+                            <GainDetail positive={gainLoss >= 0} percent={gainLossPercent} amount={formatCompactCurrency(convertedGainLoss, baseCurrency)} />
+                          )}
+                          onClick={() => handleEdit('stock', stock)}
+                          accessory={rowActions('stock', stock)}
+                        />
                       );
                     })}
-                </div>
+                </>
               );
             }
 
             if (activeTab === 'crypto') {
               if (data.crypto.length === 0) {
-                return <div className="p-8 text-center text-gray-500">No crypto added yet</div>;
+                return <div className="p-8 text-center text-ios-secondary">No crypto added yet</div>;
               }
               return (
-                <div className="divide-y divide-gray-100">
+                <>
                   {data.crypto.map(crypto => {
                     const currentPrice = crypto.currentPrice || crypto.purchasePrice;
                     const currentValue = currentPrice * crypto.amount;
@@ -1421,65 +1203,44 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                     const gainLossPercent = ((gainLoss / purchaseValue) * 100);
 
                     const convertedCurrentValue = convertCurrency(currentValue, crypto.currency, baseCurrency);
-                    const convertedPurchaseValue = convertCurrency(purchaseValue, crypto.currency, baseCurrency);
                     const convertedGainLoss = convertCurrency(gainLoss, crypto.currency, baseCurrency);
+                    const hasCurrent = crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice;
 
                     return (
-                      <div key={crypto.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0 mr-2">
-                            <div className="font-semibold text-lg text-gray-800 truncate">{crypto.symbol}</div>
-                            <div className="text-sm text-gray-500 mt-1">
-                              {crypto.amount.toFixed(8)} {crypto.symbol} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
+                      <Row
+                        key={crypto.id}
+                        title={<span className="font-semibold">{crypto.symbol}</span>}
+                        subtitle={
+                          <>
+                            <div className="truncate tabular-nums">
+                              {crypto.amount.toFixed(8)} @ {formatCurrency(crypto.purchasePrice, crypto.currency)}
                             </div>
-                            {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
-                              <div className="text-sm text-gray-500">
-                                Current: {formatCurrency(crypto.currentPrice, crypto.currency)}
+                            {hasCurrent && (
+                              <div className="truncate tabular-nums">
+                                Now {formatCurrency(crypto.currentPrice!, crypto.currency)}
                               </div>
                             )}
-                            <div className="text-lg font-bold text-purple-600 mt-2">
-                              {formatCompactCurrency(convertedCurrentValue, baseCurrency)}
-                            </div>
-                            {crypto.currentPrice && crypto.currentPrice !== crypto.purchasePrice && (
-                              <div className="mt-2 space-y-1">
-                                <div className={`text-sm font-semibold ${gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                  {gainLoss >= 0 ? '+' : ''}{formatCompactCurrency(convertedGainLoss, baseCurrency)}
-                                  ({gainLossPercent >= 0 ? '+' : ''}{gainLossPercent.toFixed(2)}%)
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Invested: {formatCompactCurrency(convertedPurchaseValue, baseCurrency)}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit('crypto', crypto)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                            >
-                              <Edit2 size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete('crypto', crypto.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                          </>
+                        }
+                        value={<span className="font-semibold">{formatCompactCurrency(convertedCurrentValue, baseCurrency)}</span>}
+                        detail={hasCurrent && (
+                          <GainDetail positive={gainLoss >= 0} percent={gainLossPercent} amount={formatCompactCurrency(convertedGainLoss, baseCurrency)} />
+                        )}
+                        onClick={() => handleEdit('crypto', crypto)}
+                          accessory={rowActions('crypto', crypto)}
+                      />
                     );
                   })}
-                </div>
+                </>
               );
             }
 
             if (activeTab === 'fixed') {
               if (data.fixedIncome.length === 0) {
-                return <div className="p-8 text-center text-gray-500">No fixed income investments added yet</div>;
+                return <div className="p-8 text-center text-ios-secondary">No fixed income investments added yet</div>;
               }
               return (
-                <div className="divide-y divide-gray-100">
+                <>
                   {data.fixedIncome.map(fixed => {
                     let amount = fixed.amount;
                     let currency = fixed.currency;
@@ -1499,107 +1260,58 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
                     const convertedValue = convertCurrency(amount, currency, baseCurrency);
                     return (
-                      <div key={fixed.id} className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1 min-w-0 mr-2 flex gap-3">
-                            {isLinked && (
-                              <div className="flex-shrink-0 pt-1">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                  <Building2 size={24} />
-                                </div>
+                      <Row
+                        key={fixed.id}
+                        icon={isLinked ? <IconSquare icon={Building2} color="var(--ios-blue)" /> : undefined}
+                        title={
+                          <span className="font-semibold">
+                            {name} {isLinked && <span className={badge + ' text-ios-blue'}>Linked to Cash Acct</span>}
+                          </span>
+                        }
+                        subtitle={
+                          <>
+                            <div className="truncate">
+                              Interest Rate: {fixed.interestRate}% EA
+                              {fixed.interestRate > 0 && (
+                                <span className={badge + ' ml-1.5 text-ios-green'}>grows daily</span>
+                              )}
+                            </div>
+                            {fixed.maturityDate && (
+                              <div className="truncate">
+                                Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
                               </div>
                             )}
-                            <div className="flex-1">
-                              <div className="font-semibold text-lg text-gray-800 truncate flex items-center gap-2">
-                                {name} {isLinked && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-normal">Linked to Cash Acct</span>}
-                              </div>
-                              <div className="text-sm text-gray-500 mt-1 flex items-center gap-1 flex-wrap">
-                                <span>Interest Rate: {fixed.interestRate}% EA</span>
-                                {fixed.interestRate > 0 && (
-                                  <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full">grows daily</span>
-                                )}
-                              </div>
-                              {fixed.maturityDate && (
-                                <div className="text-sm text-gray-500">
-                                  Maturity: {new Date(fixed.maturityDate).toLocaleDateString()}
-                                </div>
-                              )}
-                              <div className="text-lg font-bold text-green-600 mt-2">
-                                {formatCompactCurrency(convertedValue, baseCurrency)}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEdit('fixed', fixed)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                            >
-                              <Edit2 size={18} />
-                            </button>
-                            <button
-                              onClick={() => handleDelete('fixed', fixed.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                            >
-                              <Trash2 size={18} />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                          </>
+                        }
+                        value={<span className="font-semibold">{formatCompactCurrency(convertedValue, baseCurrency)}</span>}
+                        onClick={() => handleEdit('fixed', fixed)}
+                          accessory={rowActions('fixed', fixed)}
+                      />
                     );
                   })}
-                </div>
+                </>
               );
             }
 
-            if (data.variableInvestments.length === 0) {
-              return <div className="p-8 text-center text-gray-500">No variable investments added yet</div>;
-            }
-            return (
-              <div className="divide-y divide-gray-100">
-                {data.variableInvestments.map(inv => {
-                  const value = inv.currentValue || inv.amount;
-                  const convertedValue = convertCurrency(value, inv.currency, baseCurrency);
-                  return (
-                    <div key={inv.id} className="p-4">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1 min-w-0 mr-2">
-                          <div className="font-semibold text-lg text-gray-800 truncate">{inv.name}</div>
-                          <div className="text-sm text-gray-500 mt-1">
-                            Initial: {formatCurrency(inv.amount, inv.currency)}
-                          </div>
-                          {inv.currentValue && (
-                            <div className="text-sm text-gray-500">
-                              Current: {formatCurrency(inv.currentValue, inv.currency)}
-                            </div>
-                          )}
-                          <div className="text-lg font-bold text-yellow-600 mt-2">
-                            {formatCompactCurrency(convertedValue, baseCurrency)}
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleEdit('variable', inv)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete('variable', inv.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
+            return null;
           })()}
-        </div>
+        </Section>
       </div>
     </div>
   );
 }
 
+/** Stocks-app style gain/loss pill. */
+// Apple Stocks style: percent in a filled pill, the amount underneath.
+function GainDetail({ positive, percent, amount }: { positive: boolean; percent: number; amount: string }) {
+  return (
+    <span className="flex flex-col items-end">
+      <span className={`inline-block mt-0.5 px-1.5 py-px rounded-md text-ios-footnote font-semibold tabular-nums text-white ${positive ? 'bg-ios-green' : 'bg-ios-red'}`}>
+        {positive ? '+' : ''}{percent.toFixed(2)}%
+      </span>
+      <span className={`text-ios-caption tabular-nums ${positive ? 'text-ios-green' : 'text-ios-red'}`}>
+        {positive ? '+' : ''}{amount}
+      </span>
+    </span>
+  );
+}

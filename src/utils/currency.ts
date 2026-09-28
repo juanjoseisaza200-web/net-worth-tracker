@@ -42,6 +42,20 @@ export const formatCurrency = (amount: number, currency: Currency): string => {
   return formatter.format(amount);
 };
 
+/**
+ * Like formatCurrency, but hides ".00" on whole amounts so list rows stay
+ * short ("COP 330,000", yet "COP 603,729.43" keeps its cents).
+ */
+export const formatCurrencyTrimmed = (amount: number, currency: Currency): string => {
+  const whole = Math.abs(amount - Math.round(amount)) < 0.005;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
+  }).format(amount);
+};
+
 export const formatCompactCurrency = (amount: number, currency: Currency): string => {
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',

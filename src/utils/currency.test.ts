@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { convertCurrency, sanitizeCurrency, SUPPORTED_CURRENCIES, formatCurrency } from './currency';
+import { convertCurrency, sanitizeCurrency, SUPPORTED_CURRENCIES, formatCurrency, formatCurrencyTrimmed } from './currency';
 
 describe('convertCurrency', () => {
   it('returns the same amount when currencies match', () => {
@@ -41,5 +41,20 @@ describe('sanitizeCurrency', () => {
 describe('formatCurrency', () => {
   it('formats with two decimals', () => {
     expect(formatCurrency(1234.5, 'USD')).toContain('1,234.50');
+  });
+});
+
+describe('formatCurrencyTrimmed', () => {
+  it('drops .00 on whole amounts', () => {
+    expect(formatCurrencyTrimmed(330000, 'COP')).toBe(formatCurrency(330000, 'COP').replace('.00', ''));
+  });
+
+  it('keeps two decimals when there are cents', () => {
+    expect(formatCurrencyTrimmed(603729.43, 'COP')).toBe(formatCurrency(603729.43, 'COP'));
+    expect(formatCurrencyTrimmed(12.5, 'USD')).toBe('$12.50');
+  });
+
+  it('treats float noise below a cent as whole', () => {
+    expect(formatCurrencyTrimmed(1577772.0000001, 'COP')).toBe(formatCurrency(1577772, 'COP').replace('.00', ''));
   });
 });

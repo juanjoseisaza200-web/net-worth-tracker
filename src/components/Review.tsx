@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { ArrowLeft, Check, Trash2, Smartphone, MessageSquare } from 'lucide-react';
+import { Check, Trash2, Smartphone, MessageSquare } from 'lucide-react';
 import { AppData } from '../types';
 import { PendingEntry } from '../utils/inbox';
 import { expenseCategories, incomeCategories } from '../utils/categories';
 import { formatCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
+import { PageTitle, Segmented } from './ios';
+import { ios } from './iosStyles';
 
 interface ReviewProps {
     data: AppData;
@@ -13,8 +14,6 @@ interface ReviewProps {
     /** Book `entry` (or only discard when null), then remove the inbox item. */
     onResolve: (itemId: string, entry: PendingEntry | null) => Promise<void>;
 }
-
-const inputClass = 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm';
 
 function PendingCard({ data, entry, onResolve }: { data: AppData; entry: PendingEntry; onResolve: ReviewProps['onResolve'] }) {
     const [form, setForm] = useState({
@@ -40,72 +39,71 @@ function PendingCard({ data, entry, onResolve }: { data: AppData; entry: Pending
     };
 
     return (
-        <div className="bg-white rounded-xl shadow-sm p-4 space-y-3">
+        <div className={`${ios.card} p-4 space-y-3`}>
             <div className="flex items-start justify-between gap-3">
                 <div>
-                    <div className={`text-xl font-bold ${form.kind === 'income' ? 'text-green-600' : 'text-gray-900'}`}>
+                    <div className={`font-rounded text-ios-title2 font-bold tabular-nums ${form.kind === 'income' ? 'text-ios-green' : ''}`}>
                         {form.kind === 'income' ? '+' : '−'}{formatCurrency(entry.amount, entry.currency)}
                     </div>
-                    <div className="text-xs text-gray-500 flex items-center gap-1 mt-0.5">
+                    <div className="text-ios-footnote text-ios-secondary flex items-center gap-1 mt-0.5">
                         {entry.origin === 'applepay' ? <Smartphone size={12} /> : <MessageSquare size={12} />}
                         {formatDateForDisplay(entry.date)} · {entry.time}
                     </div>
                 </div>
-                <span className="text-xs bg-amber-50 text-amber-800 border border-amber-200 rounded-full px-2 py-0.5 text-right">
+                <span className="text-ios-caption font-medium text-ios-orange bg-ios-fill rounded-full px-2.5 py-1 text-right">
                     {entry.reason}
                 </span>
             </div>
 
+            <Segmented
+                value={form.kind}
+                onChange={(kind) => {
+                    const list = kind === 'income' ? incomeCategories : expenseCategories;
+                    setForm({ ...form, kind, category: list.includes(form.category) ? form.category : '' });
+                }}
+                options={[
+                    { value: 'expense', label: 'Expense' },
+                    { value: 'income', label: 'Income' },
+                ]}
+            />
             <div className="grid grid-cols-2 gap-2">
-                <select
-                    value={form.kind}
-                    onChange={(e) => {
-                        const kind = e.target.value as PendingEntry['kind'];
-                        const list = kind === 'income' ? incomeCategories : expenseCategories;
-                        setForm({ ...form, kind, category: list.includes(form.category) ? form.category : '' });
-                    }}
-                    className={inputClass}
-                >
-                    <option value="expense">Expense</option>
-                    <option value="income">Income</option>
-                </select>
                 <select
                     value={form.category}
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
-                    className={inputClass}
+                    className={ios.select}
                 >
                     <option value="">Category…</option>
                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
+                <select
+                    value={form.accountId}
+                    onChange={(e) => setForm({ ...form, accountId: e.target.value })}
+                    className={ios.select}
+                >
+                    <option value="">Account…</option>
+                    {data.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
             </div>
-            <select
-                value={form.accountId}
-                onChange={(e) => setForm({ ...form, accountId: e.target.value })}
-                className={inputClass}
-            >
-                <option value="">Account…</option>
-                {data.accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
             <input
                 type="text"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
                 placeholder="What was it?"
-                className={inputClass}
+                className={ios.input}
             />
 
             <div className="flex gap-2">
                 <button
                     onClick={() => resolve(true)}
                     disabled={!canSave || busy}
-                    className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold flex items-center justify-center gap-1 disabled:opacity-40"
+                    className={`${ios.buttonPrimary} flex-1`}
                 >
                     <Check size={16} /> Save
                 </button>
                 <button
                     onClick={() => resolve(false)}
                     disabled={busy}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg font-semibold flex items-center gap-1 disabled:opacity-40"
+                    className={ios.buttonDestructive}
                 >
                     <Trash2 size={16} /> Discard
                 </button>
@@ -116,18 +114,13 @@ function PendingCard({ data, entry, onResolve }: { data: AppData; entry: Pending
 
 export default function Review({ data, pending, onResolve }: ReviewProps) {
     return (
-        <div className="p-4 space-y-4">
-            <div className="flex items-center gap-3">
-                <Link to="/" className="text-gray-600 hover:text-gray-900">
-                    <ArrowLeft size={24} />
-                </Link>
-                <h1 className="text-xl font-bold text-gray-800">To review</h1>
-            </div>
+        <div className="px-4 pb-4 space-y-4">
+            <PageTitle title="To Review" />
             {pending.length === 0 ? (
-                <p className="text-center text-gray-500 py-12">All caught up. Nothing to review.</p>
+                <p className="text-center text-ios-secondary py-12">All caught up. Nothing to review.</p>
             ) : (
                 <>
-                    <p className="text-sm text-gray-500">
+                    <p className="px-1 text-ios-subhead text-ios-secondary">
                         Captured automatically but not confirmed. Transfers between your own accounts can be discarded.
                     </p>
                     {pending.map(entry => (

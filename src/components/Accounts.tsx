@@ -1,11 +1,13 @@
-import { useState } from 'react';
-import { Plus, Wallet, ArrowRightLeft, Building2, Trash2, Edit2, Settings2, CreditCard } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Wallet, ArrowRightLeft, Trash2, CreditCard, Landmark, PiggyBank, Banknote, Repeat } from 'lucide-react';
 import { AppData, Account, AccountType, Currency, Automation, ActivityLog, Income } from '../types';
-import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
-import { parseAmount } from '../utils/number';
-import { formatDateForDisplay } from '../utils/date';
+import { formatCurrency, formatCurrencyTrimmed, formatCompactCurrency, convertCurrency } from '../utils/currency';
+import { parseAmount, groupThousands, ungroupTyped, toEditableAmount } from '../utils/number';
+import { formatDateForDisplay, getOrdinalSuffix } from '../utils/date';
 import { DEFAULT_STATEMENT_DAY, getCardStatement, sumCardPayments, sumInCurrency } from '../utils/creditCard';
 import CurrencySelect from './CurrencySelect';
+import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
+import { ios } from './iosStyles';
 
 interface AccountsProps {
     data: AppData;
@@ -21,6 +23,15 @@ const accountTypes: { value: AccountType; label: string }[] = [
     { value: 'credit', label: 'Credit Card' },
     { value: 'other', label: 'Other' },
 ];
+
+// Same icon/color per account type as the Dashboard's Accounts list.
+const ACCOUNT_ICONS: Record<AccountType, { icon: typeof Landmark; color: string }> = {
+    checking: { icon: Landmark, color: 'var(--ios-blue)' },
+    savings: { icon: PiggyBank, color: 'var(--ios-green)' },
+    cash: { icon: Banknote, color: 'var(--ios-teal)' },
+    credit: { icon: CreditCard, color: 'var(--ios-orange)' },
+    other: { icon: Wallet, color: 'var(--ios-gray)' },
+};
 
 /** Sentinel for "somebody else paid this" in the payment form's source select. */
 const EXTERNAL_PAYER = 'external';
@@ -62,6 +73,17 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     });
 
     const [payingCardId, setPayingCardId] = useState<string | null>(null);
+    const accountFormRef = useRef<HTMLDivElement>(null);
+    const automationFormRef = useRef<HTMLDivElement>(null);
+
+    // Rows are tapped far down the list, but the edit forms render above it:
+    // bring the form into view whenever an account or automation is opened.
+    useEffect(() => {
+        if (editingAccountId) accountFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [editingAccountId]);
+    useEffect(() => {
+        if (editingAutomationId) automationFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, [editingAutomationId]);
     const [paymentForm, setPaymentForm] = useState({
         amount: '',
         sourceAccountId: '',
@@ -79,6 +101,15 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
     };
 
     const accounts = data.accounts || [];
+
+    // Deleting from the edit form removes the account; close the now-stale form.
+    const editedAccountExists = !editingAccountId || accounts.some(a => a.id === editingAccountId);
+    useEffect(() => {
+        if (!editedAccountExists) {
+            setEditingAccountId(null);
+            setShowAddForm(false);
+        }
+    }, [editedAccountExists]);
 
     const handleAddSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -301,7 +332,7 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
             type: account.type,
             currency: account.currency,
             // Cards are edited as the positive amount owed, matching how they're added.
-            balance: (account.type === 'credit' ? Math.abs(account.balance) : account.balance).toString(),
+            balance: toEditableAmount(account.type === 'credit' ? Math.abs(account.balance) : account.balance),
             statementDay: account.statementDay ?? DEFAULT_STATEMENT_DAY,
             paymentDueDate: account.paymentDueDate || '',
             matchKeys: (account.matchKeys || []).join(', '),
@@ -410,104 +441,243 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
         return sum + convertCurrency(acc.balance, acc.currency, baseCurrency);
     }, 0);
 
-    return (
-        <div className="p-4 space-y-4 pb-24 relative min-h-screen">
-            {/* Header */}
-            <div className="bg-white rounded-lg shadow p-4 mb-4">
-                <div className="flex bg-gray-100 p-1 rounded-lg mb-4">
-                    <button
-                        onClick={() => setViewMode('accounts')}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md ${viewMode === 'accounts' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}
-                    >
-                        Accounts
-                    </button>
-                    <button
-                        onClick={() => setViewMode('automations')}
-                        className={`flex-1 py-2 text-sm font-semibold rounded-md ${viewMode === 'automations' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}
-                    >
-                        Automations
-                    </button>
-                </div>
-                {viewMode === 'accounts' ? (
-                  <>
-                    <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold text-gray-800">Accounts</h1>
-                        <CurrencySelect
-                            value={baseCurrency}
-                            onChange={onCurrencyChange}
-                            className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
-                        />
+    const renderAccount = (account: Account) => {
+        const isCredit = account.type === 'credit';
+        const statement = isCredit
+            ? getCardStatement(data.expenses, account.id, account.statementDay ?? DEFAULT_STATEMENT_DAY, new Date())
+            : null;
+        // Payments made after the cutoff are paying off the statement
+        // that closed on it, so they net against the billed total.
+        const billed = statement ? sumInCurrency(statement.billed, account.currency) : 0;
+        const paid = statement ? sumCardPayments(data.activityLogs, account.id, statement.currentStart, account.currency) : 0;
+        const running = statement ? sumInCurrency(statement.current, account.currency) : 0;
+        const { icon, color } = ACCOUNT_ICONS[account.type] || ACCOUNT_ICONS.other;
+        const converted = account.currency !== baseCurrency
+            ? `≈ ${formatCurrency(convertCurrency(account.balance, account.currency, baseCurrency), baseCurrency)}`
+            : null;
+
+        return (
+            <div key={account.id} className="ios-row">
+                <Row
+                    icon={<IconSquare icon={icon} color={color} />}
+                    onClick={() => handleEditAccount(account)}
+                    title={account.name}
+                    subtitle={accountTypes.find(t => t.value === account.type)?.label || account.type}
+                    value={isCredit
+                        ? <span className="text-ios-red">{formatCurrencyTrimmed(Math.max(0, -account.balance), account.currency)}</span>
+                        : formatCurrencyTrimmed(account.balance, account.currency)}
+                    detail={isCredit || converted
+                        ? <>
+                            {isCredit && <div>Total owed</div>}
+                            {converted && <div className="tabular-nums">{converted}</div>}
+                          </>
+                        : undefined}
+                />
+
+                {isCredit && statement && (
+                    <div className="pl-[58px] pr-4 pb-3 space-y-3">
+                        <div className="p-3 rounded-xl bg-ios-fill text-ios-footnote tabular-nums">
+                            <div className="flex justify-between gap-3">
+                                <span className="text-ios-secondary">
+                                    Statement closed {formatDateForDisplay(statement.lastCutoff)}
+                                </span>
+                                <span className="text-ios-label">{formatCurrency(billed, account.currency)}</span>
+                            </div>
+                            {paid > 0 && (
+                                <>
+                                    <div className="flex justify-between gap-3 mt-1">
+                                        <span className="text-ios-secondary">Paid since then</span>
+                                        <span className="text-ios-green">−{formatCurrency(paid, account.currency)}</span>
+                                    </div>
+                                    <div className="flex justify-between gap-3 mt-1 pt-1 border-t-[0.5px] border-ios-separator">
+                                        <span className="text-ios-label font-medium">Left on this statement</span>
+                                        <span className="text-ios-label font-semibold">
+                                            {formatCurrency(Math.max(0, billed - paid), account.currency)}
+                                        </span>
+                                    </div>
+                                </>
+                            )}
+                            <div className="flex justify-between gap-3 mt-2 pt-2 border-t-[0.5px] border-ios-separator">
+                                <span className="text-ios-secondary">
+                                    Current cycle (since {formatDateForDisplay(statement.currentStart)})
+                                </span>
+                                <span className="text-ios-label">{formatCurrency(running, account.currency)}</span>
+                            </div>
+                            <div className="mt-2 text-ios-caption text-ios-secondary">
+                                {account.paymentDueDate
+                                    ? `Due ${formatDateForDisplay(account.paymentDueDate)}`
+                                    : 'No due date set — edit the account to add it.'}
+                            </div>
+                        </div>
+
+                        {payingCardId === account.id ? (
+                            <form onSubmit={handleCardPayment} className="space-y-3">
+                                <div>
+                                    <label className={ios.label}>
+                                        Amount ({account.currency})
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        lang="en-US"
+                                        required
+                                        autoFocus
+                                        value={paymentForm.amount}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(',', '.');
+                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                                setPaymentForm({ ...paymentForm, amount: val });
+                                            }
+                                        }}
+                                        className={ios.input}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div>
+                                    <label className={ios.label}>Paid from</label>
+                                    <select
+                                        required
+                                        value={paymentForm.sourceAccountId}
+                                        onChange={(e) => setPaymentForm({ ...paymentForm, sourceAccountId: e.target.value })}
+                                        className={ios.select}
+                                    >
+                                        <option value="">Select source...</option>
+                                        {accounts.filter(a => a.type !== 'credit').map(a => (
+                                            <option key={a.id} value={a.id}>
+                                                {a.name} ({formatCurrency(a.balance, a.currency)})
+                                            </option>
+                                        ))}
+                                        <option value={EXTERNAL_PAYER}>Someone else paid</option>
+                                    </select>
+                                </div>
+                                {paymentForm.sourceAccountId === EXTERNAL_PAYER && (
+                                    <label className="flex items-start gap-2 px-1 text-ios-subhead text-ios-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={paymentForm.recordAsIncome}
+                                            onChange={(e) => setPaymentForm({ ...paymentForm, recordAsIncome: e.target.checked })}
+                                            className="mt-0.5 w-4 h-4 accent-ios-green"
+                                        />
+                                        <span>
+                                            Record as income
+                                            <span className="block text-ios-footnote text-ios-secondary">
+                                                Your net worth goes up when someone else pays. Logging it keeps that visible.
+                                            </span>
+                                        </span>
+                                    </label>
+                                )}
+                                <div className="flex gap-2">
+                                    <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                                        Record Payment
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPayingCardId(null)}
+                                        className={`${ios.buttonSecondary} flex-1`}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        ) : (
+                            <button
+                                onClick={() => {
+                                    setPaymentForm({ amount: '', sourceAccountId: '', recordAsIncome: true });
+                                    setPayingCardId(account.id);
+                                }}
+                                className={`${ios.buttonSecondary} w-full h-9 text-ios-subhead font-semibold`}
+                            >
+                                Pay Card
+                            </button>
+                        )}
                     </div>
-                    <div className="text-sm text-gray-600 mb-1">Total Liquid Cash</div>
-                    <div className="text-4xl font-bold text-blue-600">
-                        {formatCompactCurrency(totalCashBaseCurrency, baseCurrency)}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex items-center justify-between mb-4">
-                        <h1 className="text-2xl font-bold text-gray-800">Automations</h1>
-                    </div>
-                    <p className="text-sm text-gray-600">
-                        Set up automated transfers between your accounts to manage your budget effortlessly.
-                    </p>
-                  </>
                 )}
+            </div>
+        );
+    };
+
+    const cashAccounts = accounts.filter(a => a.type !== 'credit');
+    const creditAccounts = accounts.filter(a => a.type === 'credit');
+
+    return (
+        <div className="px-4 pb-4">
+            <PageTitle title={viewMode === 'accounts' ? 'Accounts' : 'Automations'}>
+                {viewMode === 'accounts' && (
+                    <CurrencySelect
+                        value={baseCurrency}
+                        onChange={onCurrencyChange}
+                        aria-label="View currency"
+                        className={ios.pillSelect}
+                    />
+                )}
+            </PageTitle>
+
+            <div className="mb-5">
+                <Segmented
+                    options={[
+                        { value: 'accounts', label: 'Accounts' },
+                        { value: 'automations', label: 'Automations' },
+                    ]}
+                    value={viewMode}
+                    onChange={setViewMode}
+                />
             </div>
 
             {viewMode === 'automations' && (
-                <>
+                <div className="space-y-6">
+                    <p className="px-1 text-ios-subhead text-ios-secondary">
+                        Set up automated transfers between your accounts to manage your budget effortlessly.
+                    </p>
+
                     {/* Automations Actions */}
-                    <div className="mb-4">
-                        <button
-                            onClick={() => {
-                                setEditingAutomationId(null);
-                                setAutomationForm({
-                                    name: '', type: 'transfer', sourceAccountId: '', destinationAccountId: '',
-                                    amount: '', keepAmount: '', dayOfMonth: 15, isActive: true
-                                });
-                                setShowAutomationForm(true);
-                            }}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
-                        >
-                            <Plus size={20} /> Add Automation
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            setEditingAutomationId(null);
+                            setAutomationForm({
+                                name: '', type: 'transfer', sourceAccountId: '', destinationAccountId: '',
+                                amount: '', keepAmount: '', dayOfMonth: 15, isActive: true
+                            });
+                            setShowAutomationForm(true);
+                        }}
+                        className={`${ios.buttonPrimary} w-full`}
+                    >
+                        <Plus size={20} /> Add Automation
+                    </button>
 
                     {/* Automation Form */}
                     {showAutomationForm && (
-                        <div className="bg-white rounded-lg shadow p-4 mb-4">
-                            <h2 className="text-lg font-semibold mb-4">{editingAutomationId ? 'Edit Automation' : 'New Automation'}</h2>
+                        <div ref={automationFormRef} className={`${ios.card} p-4 scroll-mt-16`}>
+                            <h2 className="text-ios-headline mb-4 px-1">{editingAutomationId ? 'Edit Automation' : 'New Automation'}</h2>
                             <form onSubmit={handleAutomationSubmit} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                                    <label className={ios.label}>Name</label>
                                     <input
                                         type="text"
                                         required
                                         value={automationForm.name}
                                         onChange={(e) => setAutomationForm({ ...automationForm, name: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                        className={ios.input}
                                         placeholder="e.g. Savings Sweep"
                                     />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                                        <label className={ios.label}>Type</label>
                                         <select
                                             value={automationForm.type}
                                             onChange={(e) => setAutomationForm({ ...automationForm, type: e.target.value as 'sweep' | 'transfer' })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.select}
                                         >
                                             <option value="transfer">Fixed Transfer</option>
                                             <option value="sweep">Balance Sweep</option>
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Day of Month</label>
+                                        <label className={ios.label}>Day of Month</label>
                                         <select
                                             value={automationForm.dayOfMonth}
                                             onChange={(e) => setAutomationForm({ ...automationForm, dayOfMonth: parseInt(e.target.value) })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.select}
                                         >
                                             <option value={0}>End of Month</option>
                                             {Array.from({length: 28}, (_, i) => i + 1).map(day => (
@@ -516,26 +686,26 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                         </select>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">From Account</label>
+                                        <label className={ios.label}>From Account</label>
                                         <select
                                             required
                                             value={automationForm.sourceAccountId}
                                             onChange={(e) => setAutomationForm({ ...automationForm, sourceAccountId: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.select}
                                         >
                                             <option value="" disabled>Select</option>
                                             {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
                                         </select>
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">To Account</label>
+                                        <label className={ios.label}>To Account</label>
                                         <select
                                             required
                                             value={automationForm.destinationAccountId}
                                             onChange={(e) => setAutomationForm({ ...automationForm, destinationAccountId: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.select}
                                         >
                                             <option value="" disabled>Select</option>
                                             {accounts.map(acc => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
@@ -544,500 +714,333 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                 </div>
                                 {automationForm.type === 'transfer' ? (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Transfer Amount</label>
+                                        <label className={ios.label}>Transfer Amount</label>
                                         <input
                                             type="text"
                                             inputMode="decimal"
                                             required
                                             value={automationForm.amount}
                                             onChange={(e) => setAutomationForm({ ...automationForm, amount: e.target.value.replace(',', '.') })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.input}
                                             placeholder="735000"
                                         />
                                     </div>
                                 ) : (
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Keep Amount in Source Account</label>
+                                        <label className={ios.label}>Keep Amount in Source Account</label>
                                         <input
                                             type="text"
                                             inputMode="decimal"
                                             required
                                             value={automationForm.keepAmount}
                                             onChange={(e) => setAutomationForm({ ...automationForm, keepAmount: e.target.value.replace(',', '.') })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                                            className={ios.input}
                                             placeholder="7500"
                                         />
                                     </div>
                                 )}
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 px-1">
                                     <input
                                         type="checkbox"
                                         checked={automationForm.isActive}
                                         onChange={(e) => setAutomationForm({ ...automationForm, isActive: e.target.checked })}
-                                        className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                        className="w-4 h-4 accent-ios-green"
                                     />
-                                    <label className="text-sm text-gray-700">Automation is Active</label>
+                                    <label className="text-ios-subhead text-ios-label">Automation is Active</label>
                                 </div>
                                 <div className="flex gap-2">
-                                    <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">Save</button>
-                                    <button type="button" onClick={() => setShowAutomationForm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">Cancel</button>
+                                    <button type="submit" className={`${ios.buttonPrimary} flex-1`}>Save</button>
+                                    <button type="button" onClick={() => setShowAutomationForm(false)} className={`${ios.buttonSecondary} flex-1`}>Cancel</button>
                                 </div>
                             </form>
                         </div>
                     )}
 
                     {/* Automations List */}
-                    <div className="space-y-4">
+                    <Section title="Automations">
                         {(data.automations || []).map(automation => {
                             const sourceAcc = accounts.find(a => a.id === automation.sourceAccountId);
                             const destAcc = accounts.find(a => a.id === automation.destinationAccountId);
                             return (
-                                <div key={automation.id} className="bg-white rounded-lg shadow p-4">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                                <Settings2 size={20} />
+                                <div key={automation.id} className="ios-row">
+                                    <Row
+                                        onClick={() => handleEditAutomation(automation)}
+                                        icon={<IconSquare icon={Repeat} color={automation.isActive ? 'var(--ios-indigo)' : 'var(--ios-gray)'} />}
+                                        title={automation.name}
+                                        subtitle={automation.dayOfMonth === 0 ? 'End of month' : `On the ${automation.dayOfMonth}${getOrdinalSuffix(automation.dayOfMonth)}`}
+                                        accessory={
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button onClick={() => handleDeleteAutomation(automation.id)} className={ios.rowActionDestructive} aria-label="Delete automation">
+                                                    <Trash2 size={17} />
+                                                </button>
                                             </div>
-                                            <div>
-                                                <h3 className="font-semibold text-gray-800">{automation.name}</h3>
-                                                <div className="text-sm text-gray-500">
-                                                    {automation.dayOfMonth === 0 ? 'End of month' : `On the ${automation.dayOfMonth}th`}
-                                                </div>
-                                            </div>
+                                        }
+                                    />
+                                    <div className="pl-[58px] pr-4 pb-3 -mt-1 space-y-0.5">
+                                        <div className="text-ios-subhead text-ios-label">
+                                            {sourceAcc?.name || 'Unknown'} <ArrowRightLeft size={13} className="inline mx-1 text-ios-tertiary" /> {destAcc?.name || 'Unknown'}
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => handleEditAutomation(automation)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
-                                                <Edit2 size={18} />
-                                            </button>
-                                            <button onClick={() => handleDeleteAutomation(automation.id)} className="p-2 text-gray-400 hover:text-red-600 rounded-lg">
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="mt-2 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                        <div className="text-sm text-gray-700 font-medium mb-1">
-                                            {sourceAcc?.name || 'Unknown'} <ArrowRightLeft size={14} className="inline mx-1 text-gray-400" /> {destAcc?.name || 'Unknown'}
-                                        </div>
-                                        <div className="text-sm text-gray-600">
-                                            {automation.type === 'transfer' 
+                                        <div className="text-ios-footnote text-ios-secondary tabular-nums">
+                                            {automation.type === 'transfer'
                                                 ? `Transfer fixed amount: ${formatCurrency(automation.amount || 0, sourceAcc?.currency || 'USD')}`
                                                 : `Sweep all except ${formatCurrency(automation.keepAmount || 0, sourceAcc?.currency || 'USD')}`}
                                         </div>
-                                    </div>
-                                    <div className="mt-3 flex justify-between items-center text-xs">
-                                        <span className={`px-2 py-1 rounded-full ${automation.isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                                            {automation.isActive ? 'Active' : 'Paused'}
-                                        </span>
-                                        <span className="text-gray-400">
+                                        <div className="text-ios-footnote text-ios-secondary">
+                                            <span className={`font-semibold ${automation.isActive ? 'text-ios-green' : 'text-ios-secondary'}`}>
+                                                {automation.isActive ? 'Active' : 'Paused'}
+                                            </span>
+                                            {' · '}
                                             Last run: {automation.lastRunMonth || 'Never'}
-                                        </span>
+                                        </div>
                                     </div>
                                 </div>
                             );
                         })}
                         {(!data.automations || data.automations.length === 0) && (
-                            <div className="text-center py-8 text-gray-500">No automations configured yet.</div>
+                            <div className="text-center py-6 text-ios-subhead text-ios-secondary">No automations configured yet.</div>
                         )}
-                    </div>
-                </>
+                    </Section>
+                </div>
             )}
 
             {viewMode === 'accounts' && (
-                <>
+                <div className="space-y-6">
+                    <div className="px-1">
+                        <div className="text-ios-footnote uppercase text-ios-secondary">Total Liquid Cash</div>
+                        <div className="mt-0.5 font-rounded text-[40px] leading-[48px] font-bold tabular-nums tracking-tight truncate">
+                            {formatCompactCurrency(totalCashBaseCurrency, baseCurrency)}
+                        </div>
+                    </div>
 
-            {/* Actions */}
-            <div className="grid grid-cols-2 gap-4 mb-4">
-                <button
-                    onClick={() => {
-                        setEditingAccountId(null);
-                        setAddForm(emptyAddForm);
-                        setShowAddForm(true);
-                        setShowTransferForm(false);
-                    }}
-                    className="bg-blue-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
-                >
-                    <Plus size={20} /> Add Account
-                </button>
-                <button
-                    onClick={() => { setShowTransferForm(true); setShowAddForm(false); }}
-                    className="bg-purple-600 text-white py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg"
-                >
-                    <ArrowRightLeft size={20} /> Transfer
-                </button>
-            </div>
+                    {/* Actions */}
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => {
+                                setEditingAccountId(null);
+                                setAddForm(emptyAddForm);
+                                setShowAddForm(true);
+                                setShowTransferForm(false);
+                            }}
+                            className={`${ios.buttonPrimary} flex-1 px-3`}
+                        >
+                            <Plus size={20} /> Add Account
+                        </button>
+                        <button
+                            onClick={() => { setShowTransferForm(true); setShowAddForm(false); }}
+                            className={`${ios.buttonSecondary} flex-1 px-3`}
+                        >
+                            <ArrowRightLeft size={20} /> Transfer
+                        </button>
+                    </div>
 
-            {/* Add/Edit Form */}
-            {showAddForm && (
-                <div className="bg-white rounded-lg shadow p-4 mb-4">
-                    <h2 className="text-lg font-semibold mb-4">{editingAccountId ? 'Edit Account' : 'Add New Account'}</h2>
-                    <form onSubmit={handleAddSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Account Name</label>
-                            <input
-                                type="text"
-                                required
-                                value={addForm.name}
-                                onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g. Chase Checkings"
-                            />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-                                <select
-                                    value={addForm.type}
-                                    onChange={(e) => setAddForm({ ...addForm, type: e.target.value as AccountType })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                >
-                                    {accountTypes.map(t => (
-                                        <option key={t.value} value={t.value}>{t.label}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
-                                <CurrencySelect
-                                    value={addForm.currency}
-                                    onChange={(c) => setAddForm({ ...addForm, currency: c })}
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                />
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                {addForm.type === 'credit' ? 'Amount Currently Owed' : 'Initial Balance'}
-                            </label>
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                lang="en-US"
-                                required
-                                value={addForm.balance}
-                                onChange={(e) => {
-                                    const val = e.target.value.replace(',', '.');
-                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                        setAddForm({ ...addForm, balance: val });
-                                    }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="0.00"
-                            />
-                            {addForm.type === 'credit' && (
-                                <p className="mt-1 text-xs text-gray-500">
-                                    Enter your debt as a positive number. It counts against your net worth.
-                                </p>
-                            )}
-                        </div>
-                        {addForm.type === 'credit' && (
-                            <div className="grid grid-cols-2 gap-4">
+                    {/* Add/Edit Form */}
+                    {showAddForm && (
+                        <div ref={accountFormRef} className={`${ios.card} p-4 scroll-mt-16`}>
+                            <h2 className="text-ios-headline mb-4 px-1">{editingAccountId ? 'Edit Account' : 'Add New Account'}</h2>
+                            <form onSubmit={handleAddSubmit} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Statement Closes On</label>
+                                    <label className={ios.label}>Account Name</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        value={addForm.name}
+                                        onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                                        className={ios.input}
+                                        placeholder="e.g. Chase Checkings"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className={ios.label}>Type</label>
+                                        <select
+                                            value={addForm.type}
+                                            onChange={(e) => setAddForm({ ...addForm, type: e.target.value as AccountType })}
+                                            className={ios.select}
+                                        >
+                                            {accountTypes.map(t => (
+                                                <option key={t.value} value={t.value}>{t.label}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className={ios.label}>Currency</label>
+                                        <CurrencySelect
+                                            value={addForm.currency}
+                                            onChange={(c) => setAddForm({ ...addForm, currency: c })}
+                                            className={ios.select}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className={ios.label}>
+                                        {addForm.type === 'credit' ? 'Amount Currently Owed' : 'Initial Balance'}
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        lang="en-US"
+                                        required
+                                        value={groupThousands(addForm.balance)}
+                                        onChange={(e) => {
+                                            // Shown with thousands separators; stored raw ("5305255.75").
+                                            const val = ungroupTyped(e.target.value, (e.nativeEvent as InputEvent).inputType?.startsWith('delete'));
+                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                                setAddForm({ ...addForm, balance: val });
+                                            }
+                                        }}
+                                        className={ios.input}
+                                        placeholder="0.00"
+                                    />
+                                    {addForm.type === 'credit' && (
+                                        <p className={ios.hint}>
+                                            Enter your debt as a positive number. It counts against your net worth.
+                                        </p>
+                                    )}
+                                </div>
+                                {addForm.type === 'credit' && (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className={ios.label}>Statement Closes On</label>
+                                            <select
+                                                value={addForm.statementDay}
+                                                onChange={(e) => setAddForm({ ...addForm, statementDay: parseInt(e.target.value) })}
+                                                className={ios.select}
+                                            >
+                                                {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
+                                                    <option key={d} value={d}>Day {d}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className={ios.label}>Payment Due</label>
+                                            <input
+                                                type="date"
+                                                value={addForm.paymentDueDate}
+                                                onChange={(e) => setAddForm({ ...addForm, paymentDueDate: e.target.value })}
+                                                className={ios.input}
+                                            />
+                                            <p className={ios.hint}>Update each cycle — issuers shift this date.</p>
+                                        </div>
+                                    </div>
+                                )}
+                                <div>
+                                    <label className={ios.label}>Auto-capture identifiers</label>
+                                    <input
+                                        type="text"
+                                        value={addForm.matchKeys}
+                                        onChange={(e) => setAddForm({ ...addForm, matchKeys: e.target.value })}
+                                        className={ios.input}
+                                        placeholder="e.g. 1342, Black Mastercard"
+                                    />
+                                    <p className={ios.hint}>
+                                        Comma-separated: last 4 digits from bank SMS (card and account) and the card name in Apple Wallet.
+                                    </p>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="submit" className={`${ios.buttonPrimary} flex-1 px-3`}>
+                                        {editingAccountId ? 'Save' : 'Add'}
+                                    </button>
+                                    <button type="button" onClick={() => { setShowAddForm(false); setEditingAccountId(null); }} className={`${ios.buttonSecondary} flex-1 px-3`}>
+                                        Cancel
+                                    </button>
+                                </div>
+                                {editingAccountId && (
+                                    <button type="button" onClick={() => handleDeleteAccount(editingAccountId)} className={`${ios.buttonDestructive} w-full`}>
+                                        Delete Account
+                                    </button>
+                                )}
+                            </form>
+                        </div>
+                    )}
+
+                    {/* Transfer Form */}
+                    {showTransferForm && (
+                        <div className={`${ios.card} p-4`}>
+                            <h2 className="text-ios-headline mb-4 px-1">Transfer Funds</h2>
+                            <form onSubmit={handleTransferSubmit} className="space-y-4">
+                                <div>
+                                    <label className={ios.label}>From Account</label>
                                     <select
-                                        value={addForm.statementDay}
-                                        onChange={(e) => setAddForm({ ...addForm, statementDay: parseInt(e.target.value) })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        required
+                                        value={transferForm.fromAccountId}
+                                        onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}
+                                        className={ios.select}
                                     >
-                                        {Array.from({ length: 28 }, (_, i) => i + 1).map(d => (
-                                            <option key={d} value={d}>Day {d}</option>
+                                        <option value="" disabled>Select Source</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
                                         ))}
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Due</label>
-                                    <input
-                                        type="date"
-                                        value={addForm.paymentDueDate}
-                                        onChange={(e) => setAddForm({ ...addForm, paymentDueDate: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    />
-                                    <p className="mt-1 text-xs text-gray-500">Update each cycle — issuers shift this date.</p>
-                                </div>
-                            </div>
-                        )}
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Auto-capture identifiers</label>
-                            <input
-                                type="text"
-                                value={addForm.matchKeys}
-                                onChange={(e) => setAddForm({ ...addForm, matchKeys: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                placeholder="e.g. 1342, Black Mastercard"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                Comma-separated: last 4 digits from bank SMS (card and account) and the card name in Apple Wallet.
-                            </p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                                {editingAccountId ? 'Update Account' : 'Save Account'}
-                            </button>
-                            <button type="button" onClick={() => { setShowAddForm(false); setEditingAccountId(null); }} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* Transfer Form */}
-            {showTransferForm && (
-                <div className="bg-white rounded-lg shadow p-4 mb-4">
-                    <h2 className="text-lg font-semibold mb-4 text-purple-800">Transfer Funds</h2>
-                    <form onSubmit={handleTransferSubmit} className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">From Account</label>
-                            <select
-                                required
-                                value={transferForm.fromAccountId}
-                                onChange={(e) => setTransferForm({ ...transferForm, fromAccountId: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            >
-                                <option value="" disabled>Select Source</option>
-                                {accounts.map(acc => (
-                                    <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">To Account</label>
-                            <select
-                                required
-                                value={transferForm.toAccountId}
-                                onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            >
-                                <option value="" disabled>Select Destination</option>
-                                {accounts.map(acc => (
-                                    <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Amount (in {accounts.find(a => a.id === transferForm.fromAccountId)?.currency || 'source currency'})
-                            </label>
-                            <input
-                                type="text"
-                                inputMode="decimal"
-                                lang="en-US"
-                                required
-                                value={transferForm.amount}
-                                onChange={(e) => {
-                                    const val = e.target.value.replace(',', '.');
-                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                        setTransferForm({ ...transferForm, amount: val });
-                                    }
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                                placeholder="0.00"
-                            />
-                        </div>
-                        <div className="flex gap-2">
-                            <button type="submit" className="flex-1 bg-purple-600 text-white py-2 rounded-lg font-semibold">
-                                Transfer
-                            </button>
-                            <button type="button" onClick={() => setShowTransferForm(false)} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
-                                Cancel
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            {/* Account List */}
-            <div className="space-y-4">
-                {accounts.map(account => {
-                    const isCredit = account.type === 'credit';
-                    const statement = isCredit
-                        ? getCardStatement(data.expenses, account.id, account.statementDay ?? DEFAULT_STATEMENT_DAY, new Date())
-                        : null;
-                    // Payments made after the cutoff are paying off the statement
-                    // that closed on it, so they net against the billed total.
-                    const billed = statement ? sumInCurrency(statement.billed, account.currency) : 0;
-                    const paid = statement ? sumCardPayments(data.activityLogs, account.id, statement.currentStart, account.currency) : 0;
-                    const running = statement ? sumInCurrency(statement.current, account.currency) : 0;
-
-                    return (
-                    <div key={account.id} className="bg-white rounded-lg shadow p-4">
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className={`p-2 rounded-lg ${isCredit ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    {isCredit
-                                        ? <CreditCard size={20} />
-                                        : account.type === 'checking' || account.type === 'savings' ? <Building2 size={20} /> : <Wallet size={20} />}
+                                    <label className={ios.label}>To Account</label>
+                                    <select
+                                        required
+                                        value={transferForm.toAccountId}
+                                        onChange={(e) => setTransferForm({ ...transferForm, toAccountId: e.target.value })}
+                                        className={ios.select}
+                                    >
+                                        <option value="" disabled>Select Destination</option>
+                                        {accounts.map(acc => (
+                                            <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.balance, acc.currency)})</option>
+                                        ))}
+                                    </select>
                                 </div>
                                 <div>
-                                    <h3 className="font-semibold text-gray-800">{account.name}</h3>
-                                    <div className="text-sm text-gray-500">
-                                        {accountTypes.find(t => t.value === account.type)?.label || account.type}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleEditAccount(account)}
-                                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                                >
-                                    <Edit2 size={18} />
-                                </button>
-                                <button
-                                    onClick={() => handleDeleteAccount(account.id)}
-                                    className="p-2 text-gray-400 hover:text-red-600 rounded-lg"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        </div>
-                        <div className="mt-4">
-                            {isCredit ? (
-                                <>
-                                    <div className="text-sm text-gray-500">Total owed</div>
-                                    <div className="text-2xl font-bold text-red-600">
-                                        {formatCurrency(Math.max(0, -account.balance), account.currency)}
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="text-2xl font-bold text-gray-900">
-                                    {formatCurrency(account.balance, account.currency)}
-                                </div>
-                            )}
-                            {account.currency !== baseCurrency && (
-                                <div className="text-sm text-gray-500">
-                                    ≈ {formatCurrency(convertCurrency(account.balance, account.currency, baseCurrency), baseCurrency)}
-                                </div>
-                            )}
-                        </div>
-
-                        {isCredit && statement && (
-                            <div className="mt-4 space-y-3">
-                                <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                    <div className="flex justify-between text-sm">
-                                        <span className="text-gray-600">
-                                            Statement closed {formatDateForDisplay(statement.lastCutoff)}
-                                        </span>
-                                        <span className="font-medium text-gray-800">{formatCurrency(billed, account.currency)}</span>
-                                    </div>
-                                    {paid > 0 && (
-                                        <>
-                                            <div className="flex justify-between text-sm mt-1">
-                                                <span className="text-gray-600">Paid since then</span>
-                                                <span className="font-medium text-green-600">−{formatCurrency(paid, account.currency)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-sm mt-1 pt-1 border-t border-gray-200">
-                                                <span className="text-gray-700 font-medium">Left on this statement</span>
-                                                <span className="font-semibold text-gray-900">
-                                                    {formatCurrency(Math.max(0, billed - paid), account.currency)}
-                                                </span>
-                                            </div>
-                                        </>
-                                    )}
-                                    <div className="flex justify-between text-sm mt-2 pt-2 border-t border-gray-200">
-                                        <span className="text-gray-600">
-                                            Current cycle (since {formatDateForDisplay(statement.currentStart)})
-                                        </span>
-                                        <span className="font-medium text-gray-800">{formatCurrency(running, account.currency)}</span>
-                                    </div>
-                                    <div className="mt-2 text-xs text-gray-500">
-                                        {account.paymentDueDate
-                                            ? `Due ${formatDateForDisplay(account.paymentDueDate)}`
-                                            : 'No due date set — edit the account to add it.'}
-                                    </div>
-                                </div>
-
-                                {payingCardId === account.id ? (
-                                    <form onSubmit={handleCardPayment} className="p-3 bg-white border border-gray-200 rounded-lg space-y-3">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                                Amount ({account.currency})
-                                            </label>
-                                            <input
-                                                type="text"
-                                                inputMode="decimal"
-                                                lang="en-US"
-                                                required
-                                                autoFocus
-                                                value={paymentForm.amount}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(',', '.');
-                                                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                        setPaymentForm({ ...paymentForm, amount: val });
-                                                    }
-                                                }}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                                placeholder="0.00"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Paid from</label>
-                                            <select
-                                                required
-                                                value={paymentForm.sourceAccountId}
-                                                onChange={(e) => setPaymentForm({ ...paymentForm, sourceAccountId: e.target.value })}
-                                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                            >
-                                                <option value="">Select source...</option>
-                                                {accounts.filter(a => a.type !== 'credit').map(a => (
-                                                    <option key={a.id} value={a.id}>
-                                                        {a.name} ({formatCurrency(a.balance, a.currency)})
-                                                    </option>
-                                                ))}
-                                                <option value={EXTERNAL_PAYER}>Someone else paid</option>
-                                            </select>
-                                        </div>
-                                        {paymentForm.sourceAccountId === EXTERNAL_PAYER && (
-                                            <label className="flex items-start gap-2 text-sm text-gray-700">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={paymentForm.recordAsIncome}
-                                                    onChange={(e) => setPaymentForm({ ...paymentForm, recordAsIncome: e.target.checked })}
-                                                    className="mt-0.5"
-                                                />
-                                                <span>
-                                                    Record as income
-                                                    <span className="block text-xs text-gray-500">
-                                                        Your net worth goes up when someone else pays. Logging it keeps that visible.
-                                                    </span>
-                                                </span>
-                                            </label>
-                                        )}
-                                        <div className="flex gap-2">
-                                            <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold">
-                                                Record Payment
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setPayingCardId(null)}
-                                                className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold"
-                                            >
-                                                Cancel
-                                            </button>
-                                        </div>
-                                    </form>
-                                ) : (
-                                    <button
-                                        onClick={() => {
-                                            setPaymentForm({ amount: '', sourceAccountId: '', recordAsIncome: true });
-                                            setPayingCardId(account.id);
+                                    <label className={ios.label}>
+                                        Amount (in {accounts.find(a => a.id === transferForm.fromAccountId)?.currency || 'source currency'})
+                                    </label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        lang="en-US"
+                                        required
+                                        value={transferForm.amount}
+                                        onChange={(e) => {
+                                            const val = e.target.value.replace(',', '.');
+                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
+                                                setTransferForm({ ...transferForm, amount: val });
+                                            }
                                         }}
-                                        className="w-full bg-green-600 text-white py-2 rounded-lg font-semibold"
-                                    >
-                                        Pay Card
+                                        className={ios.input}
+                                        placeholder="0.00"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                                        Transfer
                                     </button>
-                                )}
+                                    <button type="button" onClick={() => setShowTransferForm(false)} className={`${ios.buttonSecondary} flex-1`}>
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* Account List */}
+                    {accounts.length === 0 ? (
+                        <Section title="Accounts">
+                            <div className="text-center py-6 text-ios-subhead text-ios-secondary">
+                                No accounts added yet.
                             </div>
-                        )}
-                    </div>
-                    );
-                })}
-                {accounts.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                        No accounts added yet.
-                    </div>
-                )}
-            </div>
-          </>
-        )}
+                        </Section>
+                    ) : (
+                        <>
+                            {cashAccounts.length > 0 && (
+                                <Section title="Cash & Bank">
+                                    {cashAccounts.map(renderAccount)}
+                                </Section>
+                            )}
+                            {creditAccounts.length > 0 && (
+                                <Section title="Credit Cards">
+                                    {creditAccounts.map(renderAccount)}
+                                </Section>
+                            )}
+                        </>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

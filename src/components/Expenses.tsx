@@ -1,14 +1,17 @@
-import { useState } from 'react';
-import { Plus, Trash2, Edit2, TrendingUp, TrendingDown, Calendar, Wallet, Search } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Plus, Trash2, TrendingUp, TrendingDown, Calendar, Search, Hash, Repeat } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
-import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
+import { formatCurrency, formatCurrencyTrimmed, formatCompactCurrency, convertCurrency } from '../utils/currency';
 import { calculateTotalIncome, calculateCategoryBreakdown } from '../utils/calculations';
 import { expenseCategories, incomeCategories } from '../utils/categories';
-import { formatDateForDisplay } from '../utils/date';
+import { formatDateForDisplay, getOrdinalSuffix } from '../utils/date';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
 import ChartErrorBoundary from './ChartErrorBoundary';
+import { Section, Row, Switch, PageTitle, Segmented } from './ios';
+import { ios } from './iosStyles';
+import { useIosColors } from '../utils/useIosColors';
 
 interface ExpensesProps {
   data: AppData;
@@ -32,8 +35,13 @@ const PERIOD_TITLES: Record<ExpensePeriod, string> = {
   fortnight: 'This Fortnight',
 };
 
-// Palette for the spending-by-category chart, assigned by index.
-const CATEGORY_COLORS = ['#3b82f6', '#ef4444', '#f59e0b', '#10b981', '#8b5cf6', '#ec4899', '#6b7280', '#14b8a6'];
+// Palette for the spending-by-category chart, assigned by index. Names are
+// iOS system colors: `var(--ios-<name>)` for HTML, resolved via useIosColors
+// for the recharts SVG cells.
+const CATEGORY_COLORS = ['blue', 'red', 'orange', 'green', 'purple', 'teal', 'gray', 'indigo'] as const;
+
+// Primary (filled) button in green, for the income/recurring actions.
+const greenButton = ios.buttonPrimary.replace('bg-ios-blue', 'bg-ios-green');
 
 // True if a YYYY-MM-DD date falls in the selected window relative to today.
 // 'fortnight' is the current half-month (days 1–15, or 16–end).
@@ -56,6 +64,16 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<RecurringIncome | null>(null);
+  const formRef = useRef<HTMLDivElement>(null);
+
+  // Rows are tapped far down the list, but the edit form renders above it:
+  // bring the form into view whenever an entry is opened for editing.
+  useEffect(() => {
+    if (editingExpense || editingIncome || editingRecurring) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [editingExpense, editingIncome, editingRecurring]);
+  const chartColors = useIosColors();
 
   const [expenseForm, setExpenseForm] = useState({
     amount: '',
@@ -437,29 +455,29 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     if (viewMode === 'expenses') {
       return (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">
+        <div className={`${ios.card} p-4`}>
+          <h2 className="text-ios-headline mb-4 px-1">
             {editingExpense ? 'Edit Expense' : 'Add New Expense'}
           </h2>
           <form onSubmit={handleExpenseSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label className={ios.label}>Description</label>
               <input
                 type="text"
                 required
                 value={expenseForm.description}
                 onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.input}
                 placeholder="What did you spend on?"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+              <label className={ios.label}>Account</label>
               <select
                 required
                 value={expenseForm.accountId}
                 onChange={(e) => setExpenseForm({ ...expenseForm, accountId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.select}
               >
                 <option value="" disabled>Select Account</option>
                 {data.accounts?.map(acc => (
@@ -467,9 +485,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <label className={ios.label}>Amount</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -482,26 +500,26 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                       setExpenseForm({ ...expenseForm, amount: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`${ios.input} tabular-nums`}
                   placeholder="0.00"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <label className={ios.label}>Currency</label>
                 <CurrencySelect
                   value={expenseForm.currency}
                   onChange={(c) => setExpenseForm({ ...expenseForm, currency: c })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.select}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label className={ios.label}>Category</label>
                 <select
                   value={expenseForm.category}
                   onChange={(e) => setExpenseForm({ ...expenseForm, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.select}
                 >
                   {expenseCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -509,21 +527,21 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <label className={ios.label}>Date</label>
                 <input
                   type="date"
                   required
                   value={expenseForm.date}
                   onChange={(e) => setExpenseForm({ ...expenseForm, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.input}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-blue-600 text-white py-2 rounded-lg font-semibold">
-                {editingExpense ? 'Update' : 'Add'} Expense
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className={`${ios.buttonPrimary} flex-1`}>
+                {editingExpense ? 'Save' : 'Add'}
               </button>
-              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
                 Cancel
               </button>
             </div>
@@ -534,29 +552,29 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     if (viewMode === 'income') {
       return (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-lg font-semibold mb-4">
+        <div className={`${ios.card} p-4`}>
+          <h2 className="text-ios-headline mb-4 px-1">
             {editingIncome ? 'Edit Income' : 'Add New Income'}
           </h2>
           <form onSubmit={handleIncomeSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <label className={ios.label}>Description</label>
               <input
                 type="text"
                 required
                 value={incomeForm.description}
                 onChange={(e) => setIncomeForm({ ...incomeForm, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.input}
                 placeholder="Salary, Freelance, etc."
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+              <label className={ios.label}>Account</label>
               <select
                 required
                 value={incomeForm.accountId}
                 onChange={(e) => setIncomeForm({ ...incomeForm, accountId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.select}
               >
                 <option value="" disabled>Select Account</option>
                 {data.accounts?.map(acc => (
@@ -564,9 +582,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 ))}
               </select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                <label className={ios.label}>Amount</label>
                 <input
                   type="text"
                   inputMode="decimal"
@@ -579,26 +597,26 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                       setIncomeForm({ ...incomeForm, amount: val });
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={`${ios.input} tabular-nums`}
                   placeholder="0.00"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <label className={ios.label}>Currency</label>
                 <CurrencySelect
                   value={incomeForm.currency}
                   onChange={(c) => setIncomeForm({ ...incomeForm, currency: c })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.select}
                 />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <label className={ios.label}>Category</label>
                 <select
                   value={incomeForm.category}
                   onChange={(e) => setIncomeForm({ ...incomeForm, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.select}
                 >
                   {incomeCategories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -606,21 +624,21 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                <label className={ios.label}>Date</label>
                 <input
                   type="date"
                   required
                   value={incomeForm.date}
                   onChange={(e) => setIncomeForm({ ...incomeForm, date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className={ios.input}
                 />
               </div>
             </div>
-            <div className="flex gap-2">
-              <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold">
-                {editingIncome ? 'Update' : 'Add'} Income
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className={`${greenButton} flex-1`}>
+                {editingIncome ? 'Save' : 'Add'}
               </button>
-              <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+              <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
                 Cancel
               </button>
             </div>
@@ -630,28 +648,28 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     }
 
     return (
-      <div className="bg-white rounded-lg shadow p-4">
-        <h2 className="text-lg font-semibold mb-4">
+      <div className={`${ios.card} p-4`}>
+        <h2 className="text-ios-headline mb-4 px-1">
           {editingRecurring ? 'Edit Recurring Income' : 'Add Recurring Income'}
         </h2>
         <form onSubmit={handleRecurringSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className={ios.label}>Description</label>
             <input
               type="text"
               required
               value={recurringForm.description}
               onChange={(e) => setRecurringForm({ ...recurringForm, description: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={ios.input}
               placeholder="Monthly Salary, Rent, etc."
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Account</label>
+            <label className={ios.label}>Account</label>
             <select
               value={recurringForm.accountId}
               onChange={(e) => setRecurringForm({ ...recurringForm, accountId: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={ios.select}
             >
               <option value="">No specific account</option>
               {data.accounts?.map(acc => (
@@ -659,9 +677,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <label className={ios.label}>Amount</label>
               <input
                 type="number"
                 inputMode="decimal"
@@ -670,26 +688,26 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 min="0"
                 value={recurringForm.amount}
                 onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`${ios.input} tabular-nums`}
                 placeholder="0.00"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+              <label className={ios.label}>Currency</label>
               <CurrencySelect
                 value={recurringForm.currency}
                 onChange={(c) => setRecurringForm({ ...recurringForm, currency: c })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.select}
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <label className={ios.label}>Category</label>
               <select
                 value={recurringForm.category}
                 onChange={(e) => setRecurringForm({ ...recurringForm, category: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={ios.select}
               >
                 {incomeCategories.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -697,8 +715,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Day of Month <Calendar size={16} className="inline ml-1" />
+              <label className={`${ios.label} flex items-center gap-1`}>
+                Day of Month <Calendar size={13} />
               </label>
               <input
                 type="number"
@@ -707,25 +725,25 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 max="31"
                 value={recurringForm.dayOfMonth}
                 onChange={(e) => setRecurringForm({ ...recurringForm, dayOfMonth: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`${ios.input} tabular-nums`}
                 placeholder="1-31"
               />
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <label className="flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl bg-ios-fill">
+            <span className="text-ios-subhead text-ios-label">Active (will be counted in monthly income)</span>
             <input
               type="checkbox"
               checked={recurringForm.isActive}
               onChange={(e) => setRecurringForm({ ...recurringForm, isActive: e.target.checked })}
-              className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+              className="w-5 h-5 shrink-0 accent-ios-green"
             />
-            <label className="text-sm text-gray-700">Active (will be counted in monthly income)</label>
-          </div>
-          <div className="flex gap-2">
-            <button type="submit" className="flex-1 bg-green-600 text-white py-2 rounded-lg font-semibold">
-              {editingRecurring ? 'Update' : 'Add'} Recurring Income
+          </label>
+          <div className="flex gap-3 pt-1">
+            <button type="submit" className={`${greenButton} flex-1`}>
+              {editingRecurring ? 'Save' : 'Add'}
             </button>
-            <button type="button" onClick={resetForms} className="flex-1 bg-gray-200 text-gray-800 py-2 rounded-lg font-semibold">
+            <button type="button" onClick={resetForms} className={`${ios.buttonSecondary} flex-1`}>
               Cancel
             </button>
           </div>
@@ -734,180 +752,138 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     );
   };
 
+  const emptyState = (text: string) => (
+    <div className="px-6 py-8 text-center text-ios-subhead text-ios-secondary">{text}</div>
+  );
+
   return (
-    <div className="p-4 space-y-4 pb-24">
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="flex border-b border-gray-200">
-          {[
-            { id: 'expenses' as ViewMode, label: 'Expenses', icon: TrendingDown },
-            { id: 'income' as ViewMode, label: 'Income', icon: TrendingUp },
-            { id: 'recurring' as ViewMode, label: 'Recurring', icon: Calendar },
-          ].map(tab => {
-            const Icon = tab.icon;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setViewMode(tab.id);
-                  if (showForm && (tab.id !== viewMode)) {
-                    resetForms();
-                  }
-                }}
-                className={`flex-1 py-3 px-2 text-center flex flex-col items-center gap-1 ${viewMode === tab.id
-                  ? 'bg-blue-50 text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-              >
-                <Icon size={20} />
-                <span className="text-xs font-medium">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
+    <div className="px-4 pb-24">
+      <PageTitle title="Expenses">
+        <CurrencySelect
+          value={baseCurrency}
+          onChange={onCurrencyChange}
+          aria-label="View currency"
+          className={ios.pillSelect}
+        />
+      </PageTitle>
 
-      {/* Time period filter (expenses) */}
-      {viewMode === 'expenses' && (
-        <div className="flex gap-2">
-          {PERIOD_OPTIONS.map(opt => (
-            <button
-              key={opt.id}
-              onClick={() => setPeriod(opt.id)}
-              className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${
-                period === opt.id ? 'bg-blue-600 text-white shadow' : 'bg-white text-gray-600 border border-gray-200'
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-      )}
+      <div className="space-y-6">
+        {/* Tabs + filters */}
+        <div className="space-y-3">
+          <Segmented<ViewMode>
+            options={[
+              { value: 'expenses', label: 'Expenses' },
+              { value: 'income', label: 'Income' },
+              { value: 'recurring', label: 'Recurring' },
+            ]}
+            value={viewMode}
+            onChange={(id) => {
+              setViewMode(id);
+              if (showForm && (id !== viewMode)) {
+                resetForms();
+              }
+            }}
+          />
 
-      {/* Search + account/category filters (expenses) */}
-      {viewMode === 'expenses' && (
-        <div className="bg-white rounded-lg shadow p-4 space-y-3">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search expenses..."
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+          {/* Time period filter (expenses) */}
+          {viewMode === 'expenses' && (
+            <Segmented<ExpensePeriod>
+              options={PERIOD_OPTIONS.map(opt => ({ value: opt.id, label: opt.label }))}
+              value={period}
+              onChange={setPeriod}
             />
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={accountFilter}
-              onChange={(e) => setAccountFilter(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="all">All accounts</option>
-              {(data.accounts || []).map(a => (
-                <option key={a.id} value={a.id}>{a.name}</option>
-              ))}
-            </select>
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg bg-white text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            >
-              <option value="all">All categories</option>
-              {expenseCategories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Spending-by-category chart (expenses) */}
-      {viewMode === 'expenses' && categoryBreakdown.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <h2 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wider">Spending by Category</h2>
-          <ChartErrorBoundary>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                  {categoryBreakdown.map((entry, i) => (
-                    <Cell key={entry.category} fill={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} />
+          {/* Search + account/category filters (expenses) */}
+          {viewMode === 'expenses' && (
+            <>
+              <div className="relative">
+                <Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-ios-secondary pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search expenses..."
+                  className={`${ios.input} pl-9`}
+                />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={accountFilter}
+                  onChange={(e) => setAccountFilter(e.target.value)}
+                  className={`${ios.select} flex-1 min-w-0 text-ios-subhead`}
+                >
+                  <option value="all">All accounts</option>
+                  {(data.accounts || []).map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
-                </Pie>
-                <Tooltip formatter={(v) => formatCurrency(Number(v), baseCurrency)} />
-              </PieChart>
-            </ResponsiveContainer>
-          </ChartErrorBoundary>
-          <div className="space-y-2 mt-2">
-            {categoryBreakdown.map((entry, i) => (
-              <div key={entry.category} className="flex justify-between items-center text-sm">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }} />
-                  <span className="font-medium text-gray-700">{entry.category}</span>
-                  <span className="text-gray-500">({entry.percentage.toFixed(1)}%)</span>
-                </div>
-                <div className="font-semibold text-gray-900">{formatCurrency(entry.value, baseCurrency)}</div>
+                </select>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className={`${ios.select} flex-1 min-w-0 text-ios-subhead`}
+                >
+                  <option value="all">All categories</option>
+                  {expenseCategories.map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
               </div>
-            ))}
-          </div>
+            </>
+          )}
         </div>
-      )}
 
-      {/* Summary Cards */}
-      {viewMode === 'expenses' && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-sm text-gray-600">
-                Total Expenses{period !== 'all' ? ` · ${PERIOD_TITLES[period]}` : ''}
+        {/* Summary tiles */}
+        {viewMode === 'expenses' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-red">
+                <TrendingDown size={16} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">Total Expenses</span>
               </div>
-              <div className="text-2xl font-bold text-red-600">
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {formatCompactCurrency(totalExpenses, baseCurrency)}
               </div>
+              {period !== 'all' && <div className="text-ios-footnote text-ios-secondary">{PERIOD_TITLES[period]}</div>}
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Count</div>
-              <div className="text-2xl font-bold text-gray-800">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-secondary">
+                <Hash size={16} strokeWidth={2.5} className="shrink-0" /> Count
+              </div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {filteredExpenses.length}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {viewMode === 'income' && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Income Overview</h2>
-            <CurrencySelect
-              value={baseCurrency}
-              onChange={onCurrencyChange}
-              className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm font-medium"
-            />
-          </div>
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-sm text-gray-600">Total Income</div>
-              <div className="text-2xl font-bold text-green-600">
+        {viewMode === 'income' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-green">
+                <TrendingUp size={16} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">Total Income</span>
+              </div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {formatCompactCurrency(totalIncome, baseCurrency)}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Monthly Income</div>
-              <div className="text-2xl font-bold text-green-600">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-green">
+                <Calendar size={16} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">Monthly Income</span>
+              </div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {formatCompactCurrency(monthlyIncome, baseCurrency)}
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {viewMode === 'recurring' && (
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="text-sm text-gray-600">Active Recurring Income</div>
-              <div className="text-2xl font-bold text-green-600">
+        {viewMode === 'recurring' && (
+          <div className="grid grid-cols-2 gap-3">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-green">
+                <Repeat size={16} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">Active</span>
+              </div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {formatCompactCurrency(
                   data.recurringIncomes
                     .filter(r => r.isActive)
@@ -916,71 +892,101 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                 )}
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-sm text-gray-600">Total Recurring</div>
-              <div className="text-2xl font-bold text-gray-800">
+            <div className={`${ios.card} p-4 min-w-0`}>
+              <div className="flex items-center gap-1.5 text-ios-subhead font-semibold text-ios-secondary">
+                <Hash size={16} strokeWidth={2.5} className="shrink-0" /> <span className="truncate">Total Recurring</span>
+              </div>
+              <div className="font-rounded text-ios-title2 font-bold mt-2 tabular-nums truncate">
                 {data.recurringIncomes.length}
               </div>
             </div>
           </div>
+        )}
+
+        {/* Spending-by-category chart (expenses) */}
+        {viewMode === 'expenses' && categoryBreakdown.length > 0 && (
+          <Section title="Spending by Category">
+            <div className="pt-4 px-4 pb-1">
+              <ChartErrorBoundary>
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} stroke="none">
+                      {categoryBreakdown.map((entry, i) => (
+                        <Cell key={entry.category} fill={chartColors[CATEGORY_COLORS[i % CATEGORY_COLORS.length]]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(v) => formatCurrency(Number(v), baseCurrency)}
+                      contentStyle={{ background: 'var(--ios-card)', border: 'none', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', color: 'var(--ios-label)' }}
+                      itemStyle={{ color: 'var(--ios-label)' }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </ChartErrorBoundary>
+            </div>
+            {categoryBreakdown.map((entry, i) => (
+              <Row
+                key={entry.category}
+                icon={<div className="w-2.5 h-2.5 rounded-full ml-1" style={{ backgroundColor: `var(--ios-${CATEGORY_COLORS[i % CATEGORY_COLORS.length]})` }} />}
+                title={entry.category}
+                value={formatCurrencyTrimmed(entry.value, baseCurrency)}
+                detail={`${entry.percentage.toFixed(1)}%`}
+              />
+            ))}
+          </Section>
+        )}
+
+        {/* Add Button */}
+        {!showForm && (
+          <button
+            onClick={() => {
+              setShowForm(true);
+              if (viewMode === 'expenses') {
+                setEditingExpense(null);
+              } else if (viewMode === 'income') {
+                setEditingIncome(null);
+              } else {
+                setEditingRecurring(null);
+              }
+            }}
+            className={`${viewMode === 'expenses' ? ios.buttonPrimary : greenButton} w-full`}
+          >
+            <Plus size={20} strokeWidth={2.5} />
+            Add {viewMode === 'expenses' ? 'Expense' : viewMode === 'income' ? 'Income' : 'Recurring Income'}
+          </button>
+        )}
+
+        {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
+        <div ref={formRef} className="scroll-mt-16 empty:hidden">
+          {renderForm()}
         </div>
-      )}
 
-      {/* Add Button */}
-      {!showForm && (
-        <button
-          onClick={() => {
-            setShowForm(true);
-            if (viewMode === 'expenses') {
-              setEditingExpense(null);
-            } else if (viewMode === 'income') {
-              setEditingIncome(null);
-            } else {
-              setEditingRecurring(null);
-            }
-          }}
-          className={`w-full py-3 rounded-lg font-semibold flex items-center justify-center gap-2 shadow-lg ${viewMode === 'expenses' ? 'bg-blue-600' : 'bg-green-600'
-            } text-white`}
-        >
-          <Plus size={20} />
-          Add {viewMode === 'expenses' ? 'Expense' : viewMode === 'income' ? 'Income' : 'Recurring Income'}
-        </button>
-      )}
-
-      {/* Form */}
-      {renderForm()}
-
-      {/* Lists */}
-      {viewMode === 'expenses' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-800">
-              {period === 'all' ? 'All Expenses' : PERIOD_TITLES[period]}
-            </h2>
-            {period !== 'all' && (
-              <span className="text-sm text-gray-500">{filteredExpenses.length} item{filteredExpenses.length === 1 ? '' : 's'}</span>
-            )}
-          </div>
-          {data.expenses.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No expenses recorded yet. Add your first expense!
+        {/* Lists */}
+        {viewMode === 'expenses' && (
+          <div className="space-y-6">
+            <div className="flex items-baseline justify-between px-1 -mb-3">
+              <h2 className="text-ios-title3 font-bold">
+                {period === 'all' ? 'All Expenses' : PERIOD_TITLES[period]}
+              </h2>
+              {period !== 'all' && (
+                <span className="text-ios-footnote text-ios-secondary tabular-nums">{filteredExpenses.length} item{filteredExpenses.length === 1 ? '' : 's'}</span>
+              )}
             </div>
-          ) : filteredExpenses.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              {hasActiveFilters ? 'No expenses match these filters.' : 'No expenses recorded yet.'}
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {(() => {
+            {data.expenses.length === 0 ? (
+              <Section>{emptyState('No expenses recorded yet. Add your first expense!')}</Section>
+            ) : filteredExpenses.length === 0 ? (
+              <Section>{emptyState(hasActiveFilters ? 'No expenses match these filters.' : 'No expenses recorded yet.')}</Section>
+            ) : (
+              (() => {
                 const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                
+
                 const grouped: { monthYear: string; expenses: Expense[]; total: number }[] = [];
-                
+
                 sortedExpenses.forEach(expense => {
                   const [year, month] = expense.date.split('-');
                   const dateObj = new Date(parseInt(year), parseInt(month) - 1);
                   const monthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-                  
+
                   let group = grouped.find(g => g.monthYear === monthYear);
                   if (!group) {
                     group = { monthYear, expenses: [], total: 0 };
@@ -990,81 +996,56 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                   group.total += convertCurrency(expense.amount, expense.currency, baseCurrency);
                 });
 
-                return grouped.map((group, index) => (
-                  <div key={group.monthYear}>
-                    <div className={`bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 flex justify-between ${index === 0 ? 'border-b border-gray-200' : 'border-y border-gray-200'}`}>
-                      <span>{group.monthYear}</span>
-                      <span>{formatCurrency(group.total, baseCurrency)}</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {group.expenses.map(expense => (
-                        <div key={expense.id} className="p-4 bg-white">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 min-w-0 mr-2">
-                              <div className="font-medium text-gray-800 truncate">{expense.description}</div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                {expense.category} • {formatDateForDisplay(expense.date)}
-                              </div>
-                              <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                <Wallet size={11} className="text-gray-400" />
-                                {accountNameById(expense.accountId)}
-                              </div>
-                              <div className="text-sm text-gray-400 mt-1">
-                                {formatCurrency(expense.amount, expense.currency)}
-                                {expense.currency !== baseCurrency && (
-                                  <span className="ml-1">
-                                    ({formatCurrency(convertCurrency(expense.amount, expense.currency, baseCurrency), baseCurrency)})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditExpense(expense)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteExpense(expense.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
+                return grouped.map(group => (
+                  <Section
+                    key={group.monthYear}
+                    title={group.monthYear}
+                    action={<span className="text-ios-footnote text-ios-secondary tabular-nums">{formatCurrencyTrimmed(group.total, baseCurrency)}</span>}
+                  >
+                    {group.expenses.map(expense => (
+                      <Row
+                        key={expense.id}
+                        onClick={() => handleEditExpense(expense)}
+                        title={expense.description}
+                        subtitle={`${expense.category} · ${accountNameById(expense.accountId)}`}
+                        value={<span className="text-ios-red">−{formatCurrencyTrimmed(expense.amount, expense.currency)}</span>}
+                        detail={
+                          expense.currency !== baseCurrency
+                            ? `≈ ${formatCurrencyTrimmed(convertCurrency(expense.amount, expense.currency, baseCurrency), baseCurrency)} · ${formatDateForDisplay(expense.date)}`
+                            : formatDateForDisplay(expense.date)
+                        }
+                        accessory={
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => handleDeleteExpense(expense.id)} className={ios.rowActionDestructive} aria-label="Delete expense">
+                              <Trash2 size={17} />
+                            </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                        }
+                      />
+                    ))}
+                  </Section>
                 ));
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {viewMode === 'income' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800">All Income</h2>
+              })()
+            )}
           </div>
-          {data.incomes.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No income recorded yet. Add your first income!
-            </div>
-          ) : (
-            <div className="flex flex-col">
-              {(() => {
+        )}
+
+        {viewMode === 'income' && (
+          <div className="space-y-6">
+            <h2 className="text-ios-title3 font-bold px-1 -mb-3">All Income</h2>
+            {data.incomes.length === 0 ? (
+              <Section>{emptyState('No income recorded yet. Add your first income!')}</Section>
+            ) : (
+              (() => {
                 const sortedIncomes = [...data.incomes].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-                
+
                 const grouped: { monthYear: string; incomes: Income[]; total: number }[] = [];
-                
+
                 sortedIncomes.forEach(income => {
                   const [year, month] = income.date.split('-');
                   const dateObj = new Date(parseInt(year), parseInt(month) - 1);
                   const monthYear = dateObj.toLocaleString('default', { month: 'long', year: 'numeric' });
-                  
+
                   let group = grouped.find(g => g.monthYear === monthYear);
                   if (!group) {
                     group = { monthYear, incomes: [], total: 0 };
@@ -1074,134 +1055,83 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                   group.total += convertCurrency(income.amount, income.currency, baseCurrency);
                 });
 
-                return grouped.map((group, index) => (
-                  <div key={group.monthYear}>
-                    <div className={`bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700 flex justify-between ${index === 0 ? 'border-b border-gray-200' : 'border-y border-gray-200'}`}>
-                      <span>{group.monthYear}</span>
-                      <span className="text-green-600">{formatCurrency(group.total, baseCurrency)}</span>
-                    </div>
-                    <div className="divide-y divide-gray-100">
-                      {group.incomes.map(income => (
-                        <div key={income.id} className="p-4 bg-white">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1 min-w-0 mr-2">
-                              <div className="font-medium text-gray-800 truncate">{income.description}</div>
-                              <div className="text-sm text-gray-500 mt-1">
-                                {income.category} • {formatDateForDisplay(income.date)}
-                              </div>
-                              <div className="inline-flex items-center gap-1 mt-1 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-                                <Wallet size={11} className="text-gray-400" />
-                                {accountNameById(income.accountId)}
-                              </div>
-                              <div className="text-sm text-green-600 font-semibold mt-1">
-                                {formatCurrency(income.amount, income.currency)}
-                                {income.currency !== baseCurrency && (
-                                  <span className="ml-1 text-gray-400">
-                                    ({formatCurrency(convertCurrency(income.amount, income.currency, baseCurrency), baseCurrency)})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleEditIncome(income)}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                              >
-                                <Edit2 size={18} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteIncome(income.id)}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                              >
-                                <Trash2 size={18} />
-                              </button>
-                            </div>
+                return grouped.map(group => (
+                  <Section
+                    key={group.monthYear}
+                    title={group.monthYear}
+                    action={<span className="text-ios-footnote text-ios-green tabular-nums">{formatCurrencyTrimmed(group.total, baseCurrency)}</span>}
+                  >
+                    {group.incomes.map(income => (
+                      <Row
+                        key={income.id}
+                        onClick={() => handleEditIncome(income)}
+                        title={income.description}
+                        subtitle={`${income.category} · ${accountNameById(income.accountId)}`}
+                        value={<span className="text-ios-green">+{formatCurrencyTrimmed(income.amount, income.currency)}</span>}
+                        detail={
+                          income.currency !== baseCurrency
+                            ? `≈ ${formatCurrencyTrimmed(convertCurrency(income.amount, income.currency, baseCurrency), baseCurrency)} · ${formatDateForDisplay(income.date)}`
+                            : formatDateForDisplay(income.date)
+                        }
+                        accessory={
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button onClick={() => handleDeleteIncome(income.id)} className={ios.rowActionDestructive} aria-label="Delete income">
+                              <Trash2 size={17} />
+                            </button>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                        }
+                      />
+                    ))}
+                  </Section>
                 ));
-              })()}
-            </div>
-          )}
-        </div>
-      )}
-
-      {viewMode === 'recurring' && (
-        <div className="bg-white rounded-lg shadow">
-          <div className="p-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-800">Recurring Income</h2>
+              })()
+            )}
           </div>
-          {data.recurringIncomes.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">
-              No recurring income set up yet. Add your first recurring income!
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {data.recurringIncomes.map(recurring => {
+        )}
+
+        {viewMode === 'recurring' && (
+          <Section title="Recurring Income">
+            {data.recurringIncomes.length === 0 ? (
+              emptyState('No recurring income set up yet. Add your first recurring income!')
+            ) : (
+              data.recurringIncomes.map(recurring => {
                 const convertedAmount = convertCurrency(recurring.amount, recurring.currency, baseCurrency);
                 return (
-                  <div key={recurring.id} className="p-4">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-medium text-gray-800">{recurring.description}</div>
-                          {recurring.isActive ? (
-                            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">Active</span>
-                          ) : (
-                            <span className="px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-full">Inactive</span>
-                          )}
+                  <Row
+                    key={recurring.id}
+                    onClick={() => handleEditRecurring(recurring)}
+                    title={<span className={recurring.isActive ? '' : 'text-ios-secondary'}>{recurring.description}</span>}
+                    subtitle={
+                      <>
+                        <div className={`truncate tabular-nums ${recurring.isActive ? 'text-ios-green' : ''}`}>
+                          {formatCurrencyTrimmed(convertedAmount, baseCurrency)}/month · {recurring.isActive ? 'Active' : 'Inactive'}
                         </div>
-                        <div className="text-sm text-gray-500 mt-1">
-                          {recurring.category} • Every {recurring.dayOfMonth}{getOrdinalSuffix(recurring.dayOfMonth)} of the month
+                        <div className="truncate">
+                          {recurring.category} · Every {recurring.dayOfMonth}{getOrdinalSuffix(recurring.dayOfMonth)} of the month
                         </div>
-                        <div className="text-sm text-green-600 font-semibold mt-1">
-                          {formatCurrency(convertedAmount, baseCurrency)}/month
+                      </>
+                    }
+                    accessory={
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button onClick={() => handleDeleteRecurring(recurring.id)} className={ios.rowActionDestructive} aria-label="Delete recurring income">
+                          <Trash2 size={17} />
+                        </button>
+                        <div className="ml-1">
+                          <Switch
+                            checked={recurring.isActive}
+                            onChange={() => toggleRecurringActive(recurring.id)}
+                            label={recurring.isActive ? 'Deactivate' : 'Activate'}
+                          />
                         </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => toggleRecurringActive(recurring.id)}
-                          className={`p-2 rounded-lg ${recurring.isActive
-                            ? 'text-orange-600 hover:bg-orange-50'
-                            : 'text-green-600 hover:bg-green-50'
-                            }`}
-                          title={recurring.isActive ? 'Deactivate' : 'Activate'}
-                        >
-                          {recurring.isActive ? '⏸' : '▶'}
-                        </button>
-                        <button
-                          onClick={() => handleEditRecurring(recurring)}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRecurring(recurring.id)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                    }
+                  />
                 );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+              })
+            )}
+          </Section>
+        )}
+      </div>
     </div>
   );
-}
-
-function getOrdinalSuffix(day: number): string {
-  if (day > 3 && day < 21) return 'th';
-  switch (day % 10) {
-    case 1: return 'st';
-    case 2: return 'nd';
-    case 3: return 'rd';
-    default: return 'th';
-  }
 }

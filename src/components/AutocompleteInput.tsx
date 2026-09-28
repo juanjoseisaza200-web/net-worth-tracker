@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import { debounce } from '../utils/stockSearch';
+import { ios } from './iosStyles';
 
 export interface Suggestion {
   symbol: string;
@@ -173,16 +174,16 @@ export default function AutocompleteInput({
             }
           }}
           placeholder={placeholder}
-          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className={`${ios.input} pr-10`}
           autoComplete="off"
           autoCapitalize="characters"
           inputMode="text"
         />
         <div className="absolute right-3 top-1/2 transform -translate-y-1/2 pointer-events-none">
           {isLoading ? (
-            <Loader2 size={18} className="text-gray-400 animate-spin" />
+            <Loader2 size={18} className="text-ios-tertiary animate-spin" />
           ) : (
-            <Search size={18} className="text-gray-400" />
+            <Search size={18} className="text-ios-tertiary" />
           )}
         </div>
       </div>
@@ -190,12 +191,12 @@ export default function AutocompleteInput({
       {showSuggestions && (suggestions.length > 0 || error) && (
         <div
           ref={dropdownRef}
-          className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
+          className="absolute z-50 w-full mt-1.5 bg-ios-card rounded-xl shadow-lg ring-1 ring-ios-separator max-h-60 overflow-auto"
         >
           {error ? (
-            <div className="px-4 py-2 text-sm text-red-600">{error}</div>
+            <div className="px-4 py-3 text-ios-subhead text-ios-red">{error}</div>
           ) : suggestions.length === 0 ? (
-            <div className="px-4 py-2 text-sm text-gray-500">
+            <div className="px-4 py-3 text-ios-subhead text-ios-secondary">
               No results found
             </div>
           ) : (
@@ -204,22 +205,19 @@ export default function AutocompleteInput({
                 key={`${suggestion.symbol}-${index}`}
                 type="button"
                 onClick={() => handleSelect(suggestion)}
-                className={`w-full text-left px-4 py-2 hover:bg-blue-50 focus:bg-blue-50 focus:outline-none ${index === selectedIndex ? 'bg-blue-50' : ''
-                  } ${index === 0 ? 'rounded-t-lg' : ''
-                  } ${index === suggestions.length - 1 ? 'rounded-b-lg' : ''
-                  }`}
+                className={`ios-row block w-full text-left pl-4 active:bg-ios-fill focus:bg-ios-fill focus:outline-none ${index === selectedIndex ? 'bg-ios-fill' : ''}`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-800">
+                <div className="ios-row-content flex items-center justify-between py-2 pr-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-ios-headline text-ios-label">
                       {suggestion.symbol}
                     </div>
-                    <div className="text-sm text-gray-500 truncate">
+                    <div className="text-ios-footnote text-ios-secondary truncate">
                       {suggestion.name}
                     </div>
                   </div>
                   {suggestion.exchange && (
-                    <div className="ml-2 text-xs text-gray-400">
+                    <div className="ml-2 text-ios-caption text-ios-tertiary shrink-0">
                       {suggestion.exchange}
                     </div>
                   )}
