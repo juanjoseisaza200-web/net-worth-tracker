@@ -249,6 +249,35 @@ export const assignBroker = (stocks: Stock[], ids: Set<string>, broker: string):
   });
 };
 
+export type HoldingSortKey = 'value' | 'pnl' | 'pnlPercent' | 'name';
+
+/**
+ * Stocks or crypto ordered for display. `unitsOf` reads shares/coins; value
+ * and P&L amount are compared in `targetCurrency` so mixed currencies rank
+ * correctly. Returns a new array.
+ */
+export const sortHoldings = <T extends { symbol: string; purchasePrice: number; currentPrice?: number; currency: Currency }>(
+  holdings: T[],
+  unitsOf: (h: T) => number,
+  key: HoldingSortKey,
+  dir: 'asc' | 'desc',
+  targetCurrency: Currency,
+): T[] => {
+  const metric = (h: T): number => {
+    const units = unitsOf(h);
+    const value = (h.currentPrice || h.purchasePrice) * units;
+    const cost = h.purchasePrice * units;
+    if (key === 'value') return convertCurrency(value, h.currency, targetCurrency);
+    if (key === 'pnl') return convertCurrency(value - cost, h.currency, targetCurrency);
+    return cost > 0 ? (value - cost) / cost : 0;
+  };
+  const sign = dir === 'asc' ? 1 : -1;
+  return [...holdings].sort((a, b) =>
+    sign * (key === 'name'
+      ? a.symbol.localeCompare(b.symbol, undefined, { sensitivity: 'base' })
+      : metric(a) - metric(b)));
+};
+
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
   const currentYear = now.getFullYear();

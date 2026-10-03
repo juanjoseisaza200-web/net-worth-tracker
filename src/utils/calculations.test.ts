@@ -10,6 +10,8 @@ import {
   roundAccountBalances,
   groupStocksByBroker,
   assignBroker,
+  sortHoldings,
+  HoldingSortKey,
 } from './calculations';
 import { Expense } from '../types';
 
@@ -196,5 +198,44 @@ describe('assignBroker', () => {
     const out = assignBroker(stocks, new Set(['a']), '   ');
     expect('broker' in out[0]).toBe(false);
     expect(out[2].broker).toBe('Keep');
+  });
+});
+
+describe('sortHoldings', () => {
+  // value / P&L $ / P&L %:  A 70 / +20 / +40%   B 90 / -10 / -10%   C 30 / +20 / +200%
+  const holdings = [
+    { id: 'A', symbol: 'MSFT', units: 10, purchasePrice: 5, currentPrice: 7, currency: 'USD' as const },
+    { id: 'B', symbol: 'aapl', units: 1, purchasePrice: 100, currentPrice: 90, currency: 'USD' as const },
+    { id: 'C', symbol: 'NVDA', units: 3, purchasePrice: 3.3333333333, currentPrice: 10, currency: 'USD' as const },
+  ];
+  const ids = (key: HoldingSortKey, dir: 'desc' | 'asc') => sortHoldings(holdings, h => h.units, key, dir, 'USD').map(h => h.id);
+
+  it('sorts by value', () => {
+    expect(ids('value', 'desc')).toEqual(['B', 'A', 'C']);
+    expect(ids('value', 'asc')).toEqual(['C', 'A', 'B']);
+  });
+
+  it('sorts by P&L amount and by P&L percent', () => {
+    expect(ids('pnl', 'asc')[0]).toBe('B');
+    expect(ids('pnlPercent', 'desc')).toEqual(['C', 'A', 'B']);
+  });
+
+  it('sorts by name ignoring case, A-Z when ascending', () => {
+    expect(ids('name', 'asc')).toEqual(['B', 'A', 'C']);
+    expect(ids('name', 'desc')).toEqual(['C', 'A', 'B']);
+  });
+
+  it('compares value across currencies in the target currency', () => {
+    const mixed = [
+      { id: 'cop', symbol: 'X', units: 1, purchasePrice: 100000, currency: 'COP' as const }, // ~25 USD
+      { id: 'usd', symbol: 'Y', units: 1, purchasePrice: 50, currency: 'USD' as const },
+    ];
+    expect(sortHoldings(mixed, h => h.units, 'value', 'desc', 'USD').map(h => h.id)).toEqual(['usd', 'cop']);
+  });
+
+  it('does not mutate the input', () => {
+    const copy = [...holdings];
+    ids('value', 'asc');
+    expect(holdings).toEqual(copy);
   });
 });

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
-import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2 } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2, ArrowDown, ArrowUp } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -9,7 +9,7 @@ import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
 import { applyPrices } from '../utils/sync';
-import { groupStocksByBroker, brokerKey, assignBroker } from '../utils/calculations';
+import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey } from '../utils/calculations';
 import CurrencySelect from './CurrencySelect';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
@@ -24,6 +24,29 @@ interface InvestmentsProps {
 }
 
 type InvestmentType = 'stock' | 'crypto' | 'fixed';
+
+const SORT_OPTIONS: { value: HoldingSortKey; label: string }[] = [
+  { value: 'value', label: 'Value' },
+  { value: 'pnl', label: 'P&L $' },
+  { value: 'pnlPercent', label: 'P&L %' },
+  { value: 'name', label: 'Name' },
+];
+type HoldingSort = { key: HoldingSortKey; dir: 'asc' | 'desc' };
+const SORT_STORAGE_KEY = 'net-worth-tracker-holding-sort';
+const DEFAULT_SORT: Record<'stock' | 'crypto', HoldingSort> = {
+  stock: { key: 'value', dir: 'desc' },
+  crypto: { key: 'value', dir: 'desc' },
+};
+
+// The sort is a per-device convenience: storage may be missing or blocked.
+const loadHoldingSort = (): Record<'stock' | 'crypto', HoldingSort> => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY) || '{}');
+    return { ...DEFAULT_SORT, ...saved };
+  } catch {
+    return DEFAULT_SORT;
+  }
+};
 
 const TABS: { value: InvestmentType; label: string }[] = [
   { value: 'stock', label: 'Stocks' },
@@ -43,6 +66,16 @@ const badge = 'inline-block align-middle px-2 py-px rounded-full bg-ios-fill tex
 export default function Investments({ data, setData, saveLocalData, currencyFor, onCurrencyChange }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const baseCurrency = currencyFor(activeTab);
+  const [holdingSort, setHoldingSort] = useState(loadHoldingSort);
+  const updateHoldingSort = (tab: 'stock' | 'crypto', sort: HoldingSort) => {
+    const next = { ...holdingSort, [tab]: sort };
+    setHoldingSort(next);
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // Not remembered on this device; the order still applies now.
+    }
+  };
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -1263,6 +1296,38 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
 
         {/* Refresh Prices Button Removed - Now Auto-Refreshes */}
 
+        {/* Sort control (stocks / crypto) */}
+        {(activeTab === 'stock' ? visibleStocks.length : activeTab === 'crypto' ? data.crypto.length : 0) > 1 && (() => {
+          const tab = activeTab as 'stock' | 'crypto';
+          const sort = holdingSort[tab];
+          return (
+            <div className="flex items-center justify-end gap-2 -mb-3">
+              <span className="text-ios-subhead text-ios-secondary">Sort by</span>
+              <select
+                value={sort.key}
+                onChange={(e) => {
+                  // Names read A–Z by default; numbers biggest first.
+                  const key = e.target.value as HoldingSortKey;
+                  updateHoldingSort(tab, { key, dir: key === 'name' ? 'asc' : 'desc' });
+                }}
+                aria-label="Sort by"
+                className={ios.pillSelect}
+              >
+                {SORT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+              <button
+                type="button"
+                onClick={() => updateHoldingSort(tab, { ...sort, dir: sort.dir === 'desc' ? 'asc' : 'desc' })}
+                aria-label={sort.dir === 'desc' ? 'Highest first' : 'Lowest first'}
+                className="h-9 px-3 rounded-full bg-ios-fill text-ios-blue text-ios-subhead font-semibold flex items-center gap-1"
+              >
+                {sort.dir === 'desc' ? <ArrowDown size={16} strokeWidth={2.5} /> : <ArrowUp size={16} strokeWidth={2.5} />}
+                {sort.key === 'name' ? (sort.dir === 'asc' ? 'A–Z' : 'Z–A') : (sort.dir === 'desc' ? 'High' : 'Low')}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* List */}
         <Section
           title={activeTab === 'stock' ? (filteredGroup ? `${filteredGroup.broker || 'No Broker'} Stocks` : 'Stocks') : activeTab === 'crypto' ? 'Crypto' : 'Fixed Income'}
@@ -1284,15 +1349,7 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               }
               return (
                 <>
-                  {[...visibleStocks]
-                    .sort((a, b) => {
-                      const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
-                      const valueB = (b.currentPrice || b.purchasePrice) * b.shares;
-                      // Convert to base currency for accurate comparison
-                      const convertedValueA = convertCurrency(valueA, a.currency, baseCurrency);
-                      const convertedValueB = convertCurrency(valueB, b.currency, baseCurrency);
-                      return convertedValueB - convertedValueA; // Descending order (Highest to Lowest)
-                    })
+                  {sortHoldings(visibleStocks, s => s.shares, holdingSort.stock.key, holdingSort.stock.dir, baseCurrency)
                     .map(stock => {
                       const currentPrice = stock.currentPrice || stock.purchasePrice;
                       const currentValue = currentPrice * stock.shares;
@@ -1348,7 +1405,7 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               }
               return (
                 <>
-                  {data.crypto.map(crypto => {
+                  {sortHoldings(data.crypto, c => c.amount, holdingSort.crypto.key, holdingSort.crypto.dir, baseCurrency).map(crypto => {
                     const currentPrice = crypto.currentPrice || crypto.purchasePrice;
                     const currentValue = currentPrice * crypto.amount;
                     const purchaseValue = crypto.purchasePrice * crypto.amount;
