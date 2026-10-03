@@ -1,4 +1,4 @@
-import { Currency } from '../types';
+import { AppData, Currency, ViewCurrencyKey } from '../types';
 
 // The only currencies the app supports. Central source of truth used by the
 // currency picker (CurrencySelect) and by migrateData to sanitize stored data.
@@ -141,3 +141,17 @@ export const formatCurrencyNoDecimals = (amount: number, currency: Currency): st
   return formatter.format(amount);
 };
 
+
+/** Currency a screen is shown in: the one last picked there, else the base currency. */
+export const viewCurrencyFor = (data: AppData, view: ViewCurrencyKey): Currency =>
+  data.settings?.viewCurrencies?.[view] ?? data.baseCurrency;
+
+/** `data` with `view`'s currency remembered, leaving every other setting as is. */
+export const withViewCurrency = (data: AppData, view: ViewCurrencyKey, currency: Currency): AppData => ({
+  ...data,
+  settings: {
+    ...data.settings,
+    autoUpdatePrices: data.settings?.autoUpdatePrices ?? true,
+    viewCurrencies: { ...data.settings?.viewCurrencies, [view]: currency },
+  },
+});

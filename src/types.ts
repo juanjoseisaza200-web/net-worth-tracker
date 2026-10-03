@@ -1,5 +1,8 @@
 export type Currency = 'USD' | 'COP';
 
+/** Screens (and Investments tabs) that each remember their own view currency. */
+export type ViewCurrencyKey = 'dashboard' | 'expenses' | 'accounts' | 'debts' | 'stock' | 'crypto' | 'fixed';
+
 export type AccountType = 'checking' | 'savings' | 'cash' | 'credit' | 'other';
 
 export interface Account {
@@ -179,6 +182,8 @@ export interface AppData {
     dashboardLayout?: DashboardWidgetConfig[];
     /** Secret id of `inboxes/{key}`, where the iPhone shortcuts drop captures. */
     inboxKey?: string;
+    /** Currency each screen was last viewed in; unset screens use `baseCurrency`. */
+    viewCurrencies?: Partial<Record<ViewCurrencyKey, Currency>>;
   };
 }
 

@@ -18,8 +18,9 @@ interface InvestmentsProps {
   data: AppData;
   setData: (data: AppData) => void;
   saveLocalData: (data: AppData) => void;
-  baseCurrency: Currency;
-  onCurrencyChange: (currency: Currency) => void;
+  /** Each tab (Stocks / Crypto / Fixed) is shown in its own remembered currency. */
+  currencyFor: (tab: InvestmentType) => Currency;
+  onCurrencyChange: (tab: InvestmentType, currency: Currency) => void;
 }
 
 type InvestmentType = 'stock' | 'crypto' | 'fixed';
@@ -39,8 +40,9 @@ const segmentButton = (active: boolean) =>
 /** Small tinted capsule next to a holding's name (e.g. "grows daily"). */
 const badge = 'inline-block align-middle px-2 py-px rounded-full bg-ios-fill text-ios-caption font-normal';
 
-export default function Investments({ data, setData, saveLocalData, baseCurrency, onCurrencyChange }: InvestmentsProps) {
+export default function Investments({ data, setData, saveLocalData, currencyFor, onCurrencyChange }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
+  const baseCurrency = currencyFor(activeTab);
   const [showForm, setShowForm] = useState(false);
   const [editingItem, setEditingItem] = useState<{ type: InvestmentType; id: string } | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
@@ -1076,7 +1078,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           <PageTitle title="Investments">
             <CurrencySelect
               value={baseCurrency}
-              onChange={onCurrencyChange}
+              onChange={(c) => onCurrencyChange(activeTab, c)}
               aria-label="View currency"
               className={ios.pillSelect}
             />

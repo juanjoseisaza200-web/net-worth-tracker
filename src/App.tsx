@@ -1,13 +1,13 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Wallet, TrendingUp, DollarSign, Building2, Users, Inbox, ChevronRight } from 'lucide-react';
-import { AppData, Currency } from './types';
+import { AppData, Currency, ViewCurrencyKey } from './types';
 import { loadData, saveData, subscribeToData, saveDataToCloud, subscribeToInbox, deleteInboxItem } from './utils/storage';
 import { auth } from './firebase';
 import { onAuthStateChanged, User, signOut } from 'firebase/auth';
 import Login from './components/Login';
 import Header from './components/Header';
-import { fetchExchangeRates } from './utils/currency';
+import { fetchExchangeRates, viewCurrencyFor, withViewCurrency } from './utils/currency';
 import { recordNetWorthSnapshot, roundAccountBalances } from './utils/calculations';
 import { accrueFixedIncome } from './utils/fixedIncome';
 import { processInbox, applyEntry, isRecordedIn, InboxItem, PendingEntry } from './utils/inbox';
@@ -24,13 +24,6 @@ const Review = lazy(() => import('./components/Review'));
 
 function App() {
   const [data, setData] = useState<AppData>(loadData()); // Initial local load (optional, or empty)
-  const [viewCurrencies, setViewCurrencies] = useState<Record<string, Currency>>({
-    dashboard: data.baseCurrency,
-    expenses: data.baseCurrency,
-    investments: data.baseCurrency,
-    accounts: data.baseCurrency,
-    debts: data.baseCurrency
-  });
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [initError, setInitError] = useState<string | null>(null);
@@ -252,8 +245,13 @@ function App() {
   // Removed auto-save useEffect to prevent overwriting cloud data on initialization
   // useEffect(() => { ... }, [data, user]); 
 
-  const handleViewCurrencyChange = (view: string, currency: Currency) => {
-    setViewCurrencies(prev => ({ ...prev, [view]: currency }));
+  // Each screen remembers its currency in the synced settings. Before the
+  // first server sync it's kept on screen only (a view choice isn't worth
+  // the "still syncing" alert).
+  const handleViewCurrencyChange = (view: ViewCurrencyKey, currency: Currency) => {
+    const next = withViewCurrency(data, view, currency);
+    if (user && !isCloudSynced) handleLocalSave(next);
+    else handleCloudSave(next);
   };
 
   const handleManualSync = async () => {
@@ -347,11 +345,11 @@ function App() {
             </div>
           }>
           <Routes>
-            <Route path="/" element={<Dashboard data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.dashboard} onCurrencyChange={(c) => handleViewCurrencyChange('dashboard', c)} />} />
-            <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.expenses} onCurrencyChange={(c) => handleViewCurrencyChange('expenses', c)} />} />
-            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} baseCurrency={viewCurrencies.investments} onCurrencyChange={(c) => handleViewCurrencyChange('investments', c)} />} />
-            <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.accounts} onCurrencyChange={(c) => handleViewCurrencyChange('accounts', c)} />} />
-            <Route path="/debts" element={<Debts data={data} setData={handleCloudSave} baseCurrency={viewCurrencies.debts} onCurrencyChange={(c) => handleViewCurrencyChange('debts', c)} />} />
+            <Route path="/" element={<Dashboard data={data} setData={handleCloudSave} baseCurrency={viewCurrencyFor(data, 'dashboard')} onCurrencyChange={(c) => handleViewCurrencyChange('dashboard', c)} />} />
+            <Route path="/expenses" element={<Expenses data={data} setData={handleCloudSave} baseCurrency={viewCurrencyFor(data, 'expenses')} onCurrencyChange={(c) => handleViewCurrencyChange('expenses', c)} />} />
+            <Route path="/investments" element={<Investments data={data} setData={handleCloudSave} saveLocalData={handleLocalSave} currencyFor={(tab) => viewCurrencyFor(data, tab)} onCurrencyChange={handleViewCurrencyChange} />} />
+            <Route path="/accounts" element={<Accounts data={data} setData={handleCloudSave} baseCurrency={viewCurrencyFor(data, 'accounts')} onCurrencyChange={(c) => handleViewCurrencyChange('accounts', c)} />} />
+            <Route path="/debts" element={<Debts data={data} setData={handleCloudSave} baseCurrency={viewCurrencyFor(data, 'debts')} onCurrencyChange={(c) => handleViewCurrencyChange('debts', c)} />} />
             <Route path="/review" element={<Review data={data} pending={inbox.pending} onResolve={resolvePending} />} />
             <Route path="/settings" element={<Settings user={user} onLogout={() => signOut(auth)} onSync={handleManualSync} data={data} setData={handleCloudSave} />} />
           </Routes>

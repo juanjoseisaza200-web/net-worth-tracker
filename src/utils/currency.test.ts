@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { convertCurrency, sanitizeCurrency, SUPPORTED_CURRENCIES, formatCurrency, formatCurrencyTrimmed } from './currency';
+import { convertCurrency, sanitizeCurrency, SUPPORTED_CURRENCIES, formatCurrency, formatCurrencyTrimmed, viewCurrencyFor, withViewCurrency } from './currency';
+import { AppData } from '../types';
 
 describe('convertCurrency', () => {
   it('returns the same amount when currencies match', () => {
@@ -56,5 +57,26 @@ describe('formatCurrencyTrimmed', () => {
 
   it('treats float noise below a cent as whole', () => {
     expect(formatCurrencyTrimmed(1577772.0000001, 'COP')).toBe(formatCurrency(1577772, 'COP').replace('.00', ''));
+  });
+});
+
+describe('view currencies', () => {
+  const data = (settings?: AppData['settings']) => ({ baseCurrency: 'COP', settings } as AppData);
+
+  it('falls back to the base currency for a screen never set', () => {
+    expect(viewCurrencyFor(data(), 'stock')).toBe('COP');
+    expect(viewCurrencyFor(data({ autoUpdatePrices: true, viewCurrencies: { expenses: 'USD' } }), 'stock')).toBe('COP');
+  });
+
+  it('remembers each screen separately and keeps other settings', () => {
+    let d = withViewCurrency(data({ autoUpdatePrices: false, inboxKey: 'k' }), 'stock', 'USD');
+    d = withViewCurrency(d, 'expenses', 'COP');
+    expect(viewCurrencyFor(d, 'stock')).toBe('USD');
+    expect(viewCurrencyFor(d, 'expenses')).toBe('COP');
+    expect(d.settings).toMatchObject({ autoUpdatePrices: false, inboxKey: 'k' });
+  });
+
+  it('defaults autoUpdatePrices on when settings did not exist yet', () => {
+    expect(withViewCurrency(data(), 'fixed', 'USD').settings?.autoUpdatePrices).toBe(true);
   });
 });
