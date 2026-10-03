@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { processInbox, applyEntry, parseCaptureAmount, isRecordedIn, InboxItem } from './inbox';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { processInbox, applyEntry, parseCaptureAmount, isRecordedIn, sanitizeInboxItem, InboxItem } from './inbox';
 import { AppData } from '../types';
 
 const baseData = (): AppData => ({
@@ -17,8 +17,8 @@ const baseData = (): AppData => ({
   baseCurrency: 'COP',
 });
 
-// Apple Pay tap at 15:29 local time on 2026-09-20.
-const TAP_AT = new Date(2026, 8, 20, 15, 29).toISOString();
+// Apple Pay tap at 15:29 Colombia time (UTC-5) on 2026-09-20.
+const TAP_AT = '2026-09-20T15:29:00-05:00';
 
 const applePay = (id: string, over: Partial<InboxItem> = {}): InboxItem => ({
   id,
@@ -69,7 +69,7 @@ describe('processInbox', () => {
       category: 'Shopping',
       date: '2026-09-20',
       accountId: 'card',
-      capture: { via: 'applepay', at: TAP_AT },
+      capture: { via: 'applepay', at: new Date(TAP_AT).toISOString() },
     }]);
     // Card debt grows by the purchase.
     expect(data.accounts.find(a => a.id === 'card')!.balance).toBe(-130000);
@@ -124,7 +124,7 @@ describe('processInbox', () => {
   });
 
   it('pairs one SMS per purchase when the same amount is paid twice (split bill)', () => {
-    const tap2 = new Date(2026, 8, 20, 15, 30).toISOString();
+    const tap2 = '2026-09-20T15:30:00-05:00';
     const { data, pending, deleteIds } = processInbox(baseData(), [
       applePay('a1'),
       applePay('a2', { at: tap2 }),
@@ -249,5 +249,122 @@ describe('isRecordedIn', () => {
 
   it('is false for items that leave no trace (unreadable SMS)', () => {
     expect(isRecordedIn(baseData(), 'x')).toBe(false);
+  });
+});
+
+// The Apple Pay shortcut sends only what the user chose (category, optional
+// description) and the tap time; amount, merchant and card come from the bank
+// SMS that follows.
+const note = (id: string, over: Partial<InboxItem> = {}): InboxItem => ({
+  id,
+  source: 'applepay',
+  category: 'Food',
+  description: 'Almuerzo',
+  at: TAP_AT,
+  ...over,
+});
+
+describe('Apple Pay notes (no amount)', () => {
+  // Notes expire after a day, so pin the clock to shortly after the tap.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-20T16:00:00-05:00'));
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('books the SMS purchase with the category and description from the note', () => {
+    const { data, deleteIds, pending } = processInbox(baseData(), [note('n1'), creditSms('s1', 'COP30.000,00', '15:30')]);
+    expect(pending).toEqual([]);
+    expect(deleteIds.sort()).toEqual(['n1', 's1']);
+    expect(data.expenses).toEqual([{
+      id: 'inbox-n1',
+      amount: 30000,
+      currency: 'COP',
+      description: 'Almuerzo',
+      category: 'Food',
+      date: '2026-09-20',
+      accountId: 'card',
+      capture: { via: 'applepay', at: new Date(TAP_AT).toISOString(), pairedItemId: 's1' },
+    }]);
+    expect(data.accounts.find(a => a.id === 'card')!.balance).toBe(-130000);
+  });
+
+  it('falls back to the merchant when the note has no description', () => {
+    const { data } = processInbox(baseData(), [note('n1', { description: '' }), creditSms('s1')]);
+    expect(data.expenses[0].description).toBe('SAFARI SPORTS Y HOBB');
+  });
+
+  it('works whichever arrives first and is idempotent until the deletes land', () => {
+    const first = processInbox(baseData(), [creditSms('s1')]);
+    expect(first.pending.map(p => p.itemId)).toEqual(['s1']); // SMS alone waits
+    const both = processInbox(first.data, [creditSms('s1'), note('n1')]);
+    expect(both.data.expenses).toHaveLength(1);
+    const again = processInbox(both.data, [creditSms('s1'), note('n1')]);
+    expect(again.data).toBe(both.data);
+    expect(again.deleteIds.sort()).toEqual(['n1', 's1']);
+  });
+
+  it('pairs two quick purchases one note per SMS, in time order', () => {
+    const { data } = processInbox(baseData(), [
+      note('n1', { category: 'Food', at: '2026-09-20T15:29:00-05:00' }),
+      note('n2', { category: 'Transport', at: '2026-09-20T15:40:00-05:00' }),
+      creditSms('s1', 'COP30.000,00', '15:29'),
+      creditSms('s2', 'COP8.000,00', '15:41'),
+    ]);
+    expect(data.expenses.map(e => [e.amount, e.category])).toEqual([[30000, 'Food'], [8000, 'Transport']]);
+  });
+
+  it('does not pair a note with an SMS more than 15 minutes away', () => {
+    const { data, pending } = processInbox(baseData(), [note('n1'), creditSms('s1', 'COP30.000,00', '16:30')]);
+    expect(data.expenses).toEqual([]);
+    expect(pending.map(p => p.itemId)).toEqual(['s1']);
+  });
+
+  it('pre-fills the review entry when the note has no valid category', () => {
+    const { data, pending } = processInbox(baseData(), [note('n1', { category: 'Comida' }), creditSms('s1')]);
+    expect(data.expenses).toEqual([]);
+    expect(pending.map(p => [p.itemId, p.description])).toEqual([['s1', 'Almuerzo']]);
+  });
+
+  it('keeps an unmatched note for a day, then drops it', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-09-20T18:00:00-05:00'));
+    expect(processInbox(baseData(), [note('n1')]).deleteIds).toEqual([]);
+    vi.setSystemTime(new Date('2026-09-21T16:00:00-05:00'));
+    expect(processInbox(baseData(), [note('n1')]).deleteIds).toEqual(['n1']);
+  });
+});
+
+describe('SMS time zone', () => {
+  it('reads Bancolombia times as Colombia time, whatever the device zone', () => {
+    // A 15:29 SMS pairs with a tap at 20:29 UTC (= 15:29 in Colombia).
+    const { pending } = processInbox(baseData(), [applePay('a1', { at: '2026-09-20T20:29:00Z' }), creditSms('s1')]);
+    expect(pending).toEqual([]);
+  });
+});
+
+describe('confirming an Apple Pay item from review', () => {
+  it('keeps the capture so the later SMS still pairs instead of double-counting', () => {
+    const { pending } = processInbox(baseData(), [applePay('a1', { category: '' })]);
+    const booked = applyEntry(baseData(), { ...pending[0], category: 'Shopping' });
+    const later = processInbox(booked, [creditSms('s1')]);
+    expect(later.pending).toEqual([]);
+    expect(later.deleteIds).toEqual(['s1']);
+    expect(later.data.expenses).toHaveLength(1);
+  });
+});
+
+describe('sanitizeInboxItem', () => {
+  it('turns non-string fields into strings so they cannot crash processing', () => {
+    expect(sanitizeInboxItem('x', { source: 'applepay', amount: 30000, card: 42, category: 'Food' }))
+      .toEqual({ id: 'x', source: 'applepay', amount: '30000', card: '42', category: 'Food' });
+  });
+
+  it('drops nested values and unknown fields', () => {
+    expect(sanitizeInboxItem('x', { source: 'sms', text: { a: 1 }, extra: 'y' })).toEqual({ id: 'x', source: 'sms' });
+  });
+
+  it('rejects an unknown source', () => {
+    expect(sanitizeInboxItem('x', { source: 'email', text: 'hi' })).toBeNull();
   });
 });

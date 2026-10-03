@@ -30,7 +30,11 @@ service cloud.firestore {
           && request.resource.data.source in ['applepay', 'sms']
           && (!('text' in request.resource.data) || (request.resource.data.text is string && request.resource.data.text.size() <= 1000))
           && (!('merchant' in request.resource.data) || (request.resource.data.merchant is string && request.resource.data.merchant.size() <= 200))
-          && (!('description' in request.resource.data) || (request.resource.data.description is string && request.resource.data.description.size() <= 200));
+          && (!('description' in request.resource.data) || (request.resource.data.description is string && request.resource.data.description.size() <= 200))
+          && (!('amount' in request.resource.data) || (request.resource.data.amount is string && request.resource.data.amount.size() <= 40))
+          && (!('card' in request.resource.data) || (request.resource.data.card is string && request.resource.data.card.size() <= 100))
+          && (!('category' in request.resource.data) || (request.resource.data.category is string && request.resource.data.category.size() <= 50))
+          && (!('at' in request.resource.data) || (request.resource.data.at is string && request.resource.data.at.size() <= 50));
         allow read, delete: if request.auth != null
           && get(/databases/$(database)/documents/inboxes/$(key)).data.uid == request.auth.uid;
       }

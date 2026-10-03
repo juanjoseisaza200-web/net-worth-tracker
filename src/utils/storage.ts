@@ -79,7 +79,7 @@ export const migrateData = (data: any): AppData => {
 };
 
 import { doc, getDoc, setDoc, deleteDoc, onSnapshot, collection } from 'firebase/firestore';
-import type { InboxItem } from './inbox';
+import { sanitizeInboxItem, InboxItem } from './inbox';
 import { classifySnapshot, SnapshotKind } from './sync';
 import { db } from '../firebase';
 
@@ -173,7 +173,10 @@ export const unregisterInboxKey = async (key: string): Promise<void> => {
 
 export const subscribeToInbox = (key: string, onItems: (items: InboxItem[]) => void): () => void =>
   onSnapshot(collection(db, 'inboxes', key, 'items'), (snap) => {
-    onItems(snap.docs.map(d => ({ ...(d.data() as Omit<InboxItem, 'id'>), id: d.id })));
+    // Shortcuts can send anything; one malformed item must not crash the app.
+    onItems(snap.docs
+      .map(d => sanitizeInboxItem(d.id, d.data()))
+      .filter((item): item is InboxItem => item !== null));
   }, (error) => {
     console.error('Error subscribing to inbox:', error);
   });

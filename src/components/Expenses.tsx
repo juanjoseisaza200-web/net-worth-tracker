@@ -135,7 +135,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         accounts: newAccounts,
         expenses: data.expenses.map(exp =>
           exp.id === editingExpense.id
-            ? { ...expenseForm, id: exp.id, amount }
+            // Keep `capture`: it pairs an Apple Pay expense with its bank SMS;
+            // dropping it makes that SMS show up for review again.
+            ? { ...expenseForm, id: exp.id, amount, ...(exp.capture ? { capture: exp.capture } : {}) }
             : exp
         ),
       });

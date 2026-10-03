@@ -14,6 +14,12 @@ import { parseBancolombiaSms, parseSmsAmount } from './bancolombiaSms';
  *   apart (a split bill) still get one SMS each.
  * - Everything else waits in the review queue.
  *
+ * - An Apple Pay item with no amount is a "note": the shortcut only sends the
+ *   category/description the user picked and the tap time. It is joined to
+ *   the bank SMS of that purchase (nearest within PAIR_WINDOW_MS, one each),
+ *   which supplies amount, merchant and card. A note no SMS claims is dropped
+ *   after NOTE_TTL_MS.
+ *
  * Booked records take the id `inbox-<itemId>`, so re-processing an item whose
  * deletion hadn't landed yet is a no-op instead of a duplicate.
  */
@@ -48,6 +54,8 @@ export interface PendingEntry {
   accountId: string;
   /** Why this needs a human. */
   reason: string;
+  /** applepay: ISO time of the tap, kept so the booked expense can still pair with its SMS. */
+  capturedAt?: string;
 }
 
 export interface InboxResult {
@@ -59,6 +67,25 @@ export interface InboxResult {
 }
 
 const PAIR_WINDOW_MS = 15 * 60 * 1000;
+const NOTE_TTL_MS = 24 * 60 * 60 * 1000;
+
+const TEXT_FIELDS = ['text', 'amount', 'merchant', 'card', 'category', 'description', 'at'] as const;
+
+/**
+ * Inbox items come from shortcuts through the REST API, so their fields can be
+ * anything (a shortcut can send the amount as a number). Keep only the known
+ * fields, as strings; one malformed item must not crash processing.
+ */
+export const sanitizeInboxItem = (id: string, raw: Record<string, unknown>): InboxItem | null => {
+  if (raw.source !== 'applepay' && raw.source !== 'sms') return null;
+  const item: InboxItem = { id, source: raw.source };
+  for (const key of TEXT_FIELDS) {
+    const v = raw[key];
+    if (typeof v === 'string') item[key] = v;
+    else if (typeof v === 'number' || typeof v === 'boolean') item[key] = String(v);
+  }
+  return item;
+};
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -81,10 +108,11 @@ const localDateTime = (d: Date) => ({
   time: `${pad(d.getHours())}:${pad(d.getMinutes())}`,
 });
 
+/** Bancolombia SMS times are Colombia time (UTC-5, no DST), wherever the phone is. */
 const timeOf = (date: string, time: string) => {
   const [y, m, d] = date.split('-').map(Number);
   const [h, mi] = time.split(':').map(Number);
-  return new Date(y, m - 1, d, h, mi).getTime();
+  return Date.UTC(y, m - 1, d, h + 5, mi);
 };
 
 const withBalance = (accounts: Account[], accountId: string, delta: number, currency: Currency) =>
@@ -114,6 +142,11 @@ export const applyEntry = (data: AppData, entry: PendingEntry): AppData => {
     category: entry.category,
     date: entry.date,
     accountId: entry.accountId,
+    // Without this the bank SMS for the same purchase couldn't pair with it
+    // and would show up for review again — a double count if confirmed.
+    ...(entry.origin === 'applepay' && entry.kind === 'expense' && entry.capturedAt
+      ? { capture: { via: 'applepay' as const, at: entry.capturedAt } }
+      : {}),
   };
   if (entry.kind === 'income') {
     if (data.incomes.some(i => i.id === id)) return data;
@@ -145,9 +178,26 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
   const deleteIds: string[] = [];
   const pending: PendingEntry[] = [];
   const targets: PairTarget[] = [];
+  const notes: { itemId: string; at: number; category: string; description: string; accountId?: string; claimed?: boolean }[] = [];
 
   // Apple Pay first, so SMS in the same batch can pair with what it books.
   for (const item of items.filter(i => i.source === 'applepay')) {
+    if (!(item.amount || '').trim()) {
+      // A note: joined to its bank SMS in the SMS loop below.
+      const at = item.at ? new Date(item.at).getTime() : NaN;
+      if (data.expenses.some(e => e.id === `inbox-${item.id}`) || Number.isNaN(at) || Date.now() - at > NOTE_TTL_MS) {
+        deleteIds.push(item.id);
+        continue;
+      }
+      notes.push({
+        itemId: item.id,
+        at,
+        category: expenseCategories.includes(item.category || '') ? item.category! : '',
+        description: (item.description || '').trim(),
+        accountId: findAccount(data.accounts, item.card)?.id,
+      });
+      continue;
+    }
     const amount = parseCaptureAmount(item.amount);
     if (amount === null || amount <= 0) {
       deleteIds.push(item.id);
@@ -196,6 +246,7 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
         time,
         accountId: account?.id ?? '',
         reason: account ? 'No category chosen' : `Card "${item.card || '?'}" not linked to an account`,
+        capturedAt: when.toISOString(),
       });
       if (account) targets.push({ accountId: account.id, amount, at: when.getTime() });
     }
@@ -229,6 +280,7 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
       continue;
     }
     const account = findAccount(data.accounts, sms.last4);
+    let noteDescription = '';
 
     if (sms.kind === 'purchase') {
       // Already paired on an earlier pass whose delete didn't land.
@@ -258,6 +310,35 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
         deleteIds.push(item.id);
         continue;
       }
+
+      // An Apple Pay note from around the same time: the SMS gives the money,
+      // the note gives what it was.
+      const note = account && notes
+        .filter(n => !n.claimed && (!n.accountId || n.accountId === account.id) && Math.abs(n.at - at) <= PAIR_WINDOW_MS)
+        .sort((a, b) => Math.abs(a.at - at) - Math.abs(b.at - at))[0];
+      if (note) {
+        note.claimed = true;
+        if (note.category) {
+          const expense: Expense = {
+            id: `inbox-${note.itemId}`,
+            amount: sms.amount,
+            currency: sms.currency,
+            description: note.description || sms.counterparty,
+            category: note.category,
+            date: sms.date,
+            accountId: account.id,
+            capture: { via: 'applepay', at: new Date(note.at).toISOString(), pairedItemId: item.id },
+          };
+          data = {
+            ...data,
+            expenses: [...data.expenses, expense],
+            accounts: withBalance(data.accounts, account.id, -sms.amount, sms.currency),
+          };
+          deleteIds.push(item.id, note.itemId);
+          continue;
+        }
+        if (note.description) noteDescription = note.description;
+      }
     }
 
     const reason = {
@@ -266,7 +347,7 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
       transfer_in: 'Transfer received',
     }[sms.kind];
     const description = {
-      purchase: sms.counterparty,
+      purchase: noteDescription || sms.counterparty,
       transfer_out: `Transfer to ${sms.counterparty}`,
       transfer_in: `Transfer from ${sms.counterparty}`,
     }[sms.kind];
