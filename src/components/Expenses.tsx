@@ -909,6 +909,31 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
           </div>
         )}
 
+        {/* Add Button: above the chart so it's reachable without scrolling */}
+        {!showForm && (
+          <button
+            onClick={() => {
+              setShowForm(true);
+              if (viewMode === 'expenses') {
+                setEditingExpense(null);
+              } else if (viewMode === 'income') {
+                setEditingIncome(null);
+              } else {
+                setEditingRecurring(null);
+              }
+            }}
+            className={`${viewMode === 'expenses' ? ios.buttonPrimary : greenButton} w-full`}
+          >
+            <Plus size={20} strokeWidth={2.5} />
+            Add {viewMode === 'expenses' ? 'Expense' : viewMode === 'income' ? 'Income' : 'Recurring Income'}
+          </button>
+        )}
+
+        {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
+        <div ref={formRef} className="scroll-mt-16 empty:hidden">
+          {renderForm()}
+        </div>
+
         {/* Spending-by-category chart (expenses) */}
         {viewMode === 'expenses' && categoryBreakdown.length > 0 && (
           <Section title="Spending by Category">
@@ -941,31 +966,6 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             ))}
           </Section>
         )}
-
-        {/* Add Button */}
-        {!showForm && (
-          <button
-            onClick={() => {
-              setShowForm(true);
-              if (viewMode === 'expenses') {
-                setEditingExpense(null);
-              } else if (viewMode === 'income') {
-                setEditingIncome(null);
-              } else {
-                setEditingRecurring(null);
-              }
-            }}
-            className={`${viewMode === 'expenses' ? ios.buttonPrimary : greenButton} w-full`}
-          >
-            <Plus size={20} strokeWidth={2.5} />
-            Add {viewMode === 'expenses' ? 'Expense' : viewMode === 'income' ? 'Income' : 'Recurring Income'}
-          </button>
-        )}
-
-        {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
-        <div ref={formRef} className="scroll-mt-16 empty:hidden">
-          {renderForm()}
-        </div>
 
         {/* Lists */}
         {viewMode === 'expenses' && (

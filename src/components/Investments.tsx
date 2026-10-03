@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
-import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2 } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -9,6 +9,7 @@ import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
 import { applyPrices } from '../utils/sync';
+import { groupStocksByBroker, brokerKey, assignBroker } from '../utils/calculations';
 import CurrencySelect from './CurrencySelect';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
@@ -66,7 +67,55 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     currency: 'USD' as Currency,
     inputMode: 'shares' as 'shares' | 'money',
     moneyAmount: '',
+    broker: '',
   });
+  // Stocks tab: show one broker (its brokerKey) or all of them (null).
+  const [brokerFilter, setBrokerFilter] = useState<string | null>(null);
+  const brokerGroups = groupStocksByBroker(data.stocks, baseCurrency);
+  const hasBrokers = brokerGroups.some(g => g.broker);
+  // A broker whose last stock was deleted or moved falls back to "All".
+  const filteredGroup = brokerFilter === null ? undefined : brokerGroups.find(g => brokerKey(g.broker) === brokerFilter);
+  const activeBroker = filteredGroup ? brokerFilter : null;
+  const visibleStocks = activeBroker === null ? data.stocks : data.stocks.filter(s => brokerKey(s.broker) === activeBroker);
+
+  // Select mode: tick several stocks and file them under one broker at once.
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkBroker, setBulkBroker] = useState('');
+  const exitSelecting = () => {
+    setSelecting(false);
+    setSelectedIds(new Set());
+    setBulkBroker('');
+  };
+  const toggleSelected = (id: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    return next;
+  });
+  // Brokers already in use, as tap-to-fill chips under a broker field.
+  const renderBrokerChoices = (value: string, onPick: (broker: string) => void) => {
+    const names = brokerGroups.map(g => g.broker).filter(Boolean);
+    if (names.length === 0) return null;
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {names.map(name => (
+          <button
+            key={brokerKey(name)}
+            type="button"
+            onClick={() => onPick(name)}
+            className={`min-h-[30px] px-3 rounded-full text-ios-footnote font-semibold ${brokerKey(value) === brokerKey(name) ? 'bg-ios-blue text-white' : 'bg-ios-fill text-ios-label'}`}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+    );
+  };
+  const handleAssignBroker = () => {
+    setData({ ...data, stocks: assignBroker(data.stocks, selectedIds, bulkBroker) });
+    exitSelecting();
+  };
 
   const [cryptoForm, setCryptoForm] = useState({
     symbol: '',
@@ -108,7 +157,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
   };
 
   const resetForms = () => {
-    setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '' });
+    setStockForm({ symbol: '', shares: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'shares', moneyAmount: '', broker: '' });
     setCryptoForm({ symbol: '', amount: '', purchasePrice: '', currentPrice: '', currency: 'USD', inputMode: 'coins', moneyAmount: '' });
     setFixedForm({ name: '', amount: '', interestRate: '', maturityDate: '', currency: 'COP', linkedAccountId: '' });
     setEditingItem(null);
@@ -144,6 +193,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
     }
 
     const currentPrice = parseAmount(stockForm.currentPrice);
+    const broker = stockForm.broker.trim();
 
     if (editingItem && editingItem.type === 'stock') {
       const updatedList = data.stocks.map(s => {
@@ -160,6 +210,11 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           } else {
             delete updated.currentPrice;
           }
+          if (broker) {
+            updated.broker = broker;
+          } else {
+            delete updated.broker;
+          }
           return updated;
         }
         return s;
@@ -175,6 +230,9 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
       };
       if (currentPrice !== null) {
         newStock.currentPrice = currentPrice;
+      }
+      if (broker) {
+        newStock.broker = broker;
       }
       setData({ ...data, stocks: [...data.stocks, newStock] });
     }
@@ -331,6 +389,7 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         currency: s.currency,
         inputMode: 'shares',
         moneyAmount: (s.shares * s.purchasePrice).toFixed(2),
+        broker: s.broker ?? '',
       });
     } else if (type === 'crypto') {
       const c = item as Crypto;
@@ -511,6 +570,17 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                 fetchSuggestions={searchStockSymbols}
                 minChars={1}
               />
+            </div>
+            <div>
+              <label className={ios.label}>Broker (optional)</label>
+              <input
+                type="text"
+                value={stockForm.broker}
+                onChange={(e) => setStockForm({ ...stockForm, broker: e.target.value })}
+                className={ios.input}
+                placeholder="e.g., Hapi, Interactive Brokers"
+              />
+              {renderBrokerChoices(stockForm.broker, (b) => setStockForm({ ...stockForm, broker: b }))}
             </div>
             {/* Input Mode Toggle */}
             <div>
@@ -1024,20 +1094,21 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
         </div>
 
         {/* Summary */}
-        {activeTab === 'stock' && data.stocks.length > 0 && (() => {
-          const totalCurrentValue = data.stocks.reduce((sum, stock) => {
+        {activeTab === 'stock' && visibleStocks.length > 0 && (() => {
+          const totalCurrentValue = visibleStocks.reduce((sum, stock) => {
             const currentPrice = stock.currentPrice || stock.purchasePrice;
             const value = currentPrice * stock.shares;
             return sum + convertCurrency(value, stock.currency, baseCurrency);
           }, 0);
-          const totalInvested = data.stocks.reduce((sum, stock) => {
+          const totalInvested = visibleStocks.reduce((sum, stock) => {
             const value = stock.purchasePrice * stock.shares;
             return sum + convertCurrency(value, stock.currency, baseCurrency);
           }, 0);
           const totalGainLoss = totalCurrentValue - totalInvested;
           const totalGainLossPercent = totalInvested > 0 ? ((totalGainLoss / totalInvested) * 100) : 0;
 
-          return renderSummary('Total Stocks Value', LineChartIcon, 'var(--ios-blue)', totalCurrentValue, (
+          const summaryLabel = filteredGroup ? `${filteredGroup.broker || 'No Broker'} Value` : 'Total Stocks Value';
+          return renderSummary(summaryLabel, LineChartIcon, 'var(--ios-blue)', totalCurrentValue, (
             <>
               <span className="text-ios-secondary tabular-nums">Invested: {formatCompactCurrency(totalInvested, baseCurrency)}</span>
               <span className={`font-semibold tabular-nums shrink-0 ${totalGainLoss >= 0 ? 'text-ios-green' : 'text-ios-red'}`}>
@@ -1093,10 +1164,89 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
           ));
         })()}
 
+        {/* Broker filter: "All" plus one chip per broker */}
+        {activeTab === 'stock' && hasBrokers && (
+          <div className="-mx-4 px-4 flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+            {[{ key: null as string | null, label: 'All' }, ...brokerGroups.map(g => ({ key: brokerKey(g.broker) as string | null, label: g.broker || 'No Broker' }))].map(chip => (
+              <button
+                key={chip.key ?? '__all'}
+                type="button"
+                onClick={() => {
+                  setBrokerFilter(chip.key);
+                  setSelectedIds(new Set()); // never act on ticks hidden by the filter
+                }}
+                className={`shrink-0 min-h-[32px] px-3.5 rounded-full text-ios-subhead font-semibold transition-colors ${activeBroker === chip.key ? 'bg-ios-blue text-white' : 'bg-ios-fill text-ios-label'}`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Per-broker breakdown of the global total */}
+        {activeTab === 'stock' && hasBrokers && activeBroker === null && (() => {
+          const total = brokerGroups.reduce((sum, g) => sum + g.value, 0);
+          return (
+            <Section title="By Broker">
+              {brokerGroups.map(g => (
+                <Row
+                  key={brokerKey(g.broker)}
+                  title={<span className="font-semibold">{g.broker || 'No Broker'}</span>}
+                  subtitle={`${g.count} stock${g.count !== 1 ? 's' : ''} · ${total > 0 ? ((g.value / total) * 100).toFixed(1) : '0.0'}% of total`}
+                  value={<span className="font-semibold">{formatCompactCurrency(g.value, baseCurrency)}</span>}
+                  detail={g.invested > 0 && (
+                    <GainDetail positive={g.gain >= 0} percent={(g.gain / g.invested) * 100} amount={formatCompactCurrency(g.gain, baseCurrency)} />
+                  )}
+                  onClick={() => setBrokerFilter(brokerKey(g.broker))}
+                />
+              ))}
+            </Section>
+          );
+        })()}
+
+        {/* Select mode: assign one broker to the ticked stocks */}
+        {activeTab === 'stock' && selecting && (
+          <div className={`${ios.card} p-4 space-y-3`}>
+            <div className="flex items-center justify-between px-1">
+              <span className="text-ios-headline">{selectedIds.size} selected</span>
+              <button
+                type="button"
+                onClick={() => setSelectedIds(selectedIds.size === visibleStocks.length ? new Set() : new Set(visibleStocks.map(s => s.id)))}
+                className="text-ios-body text-ios-blue"
+              >
+                {selectedIds.size === visibleStocks.length ? 'Deselect All' : 'Select All'}
+              </button>
+            </div>
+            <div>
+              <label className={ios.label}>Broker</label>
+              <input
+                type="text"
+                value={bulkBroker}
+                onChange={(e) => setBulkBroker(e.target.value)}
+                className={ios.input}
+                placeholder="Leave empty to remove the broker"
+              />
+              {renderBrokerChoices(bulkBroker, setBulkBroker)}
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={handleAssignBroker} disabled={selectedIds.size === 0} className={`${ios.buttonPrimary} flex-1`}>
+                Assign
+              </button>
+              <button type="button" onClick={exitSelecting} className={`${ios.buttonSecondary} flex-1`}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Add Button */}
-        {!showForm && (
+        {!showForm && !(activeTab === 'stock' && selecting) && (
           <button
-            onClick={() => setShowForm(true)}
+            onClick={() => {
+              // Adding while viewing one broker files the new stock there.
+              if (activeTab === 'stock' && filteredGroup) setStockForm(prev => ({ ...prev, broker: filteredGroup.broker }));
+              setShowForm(true);
+            }}
             className={`${ios.buttonPrimary} w-full`}
           >
             <Plus size={20} strokeWidth={2.5} />
@@ -1113,17 +1263,26 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
 
         {/* List */}
         <Section
-          title={activeTab === 'stock' ? 'Stocks' : activeTab === 'crypto' ? 'Crypto' : 'Fixed Income'}
+          title={activeTab === 'stock' ? (filteredGroup ? `${filteredGroup.broker || 'No Broker'} Stocks` : 'Stocks') : activeTab === 'crypto' ? 'Crypto' : 'Fixed Income'}
           footer={priceUpdateTime && `Last updated: ${priceUpdateTime.toLocaleTimeString()}`}
+          action={activeTab === 'stock' && visibleStocks.length > 0 && !showForm && (
+            <button
+              type="button"
+              onClick={() => (selecting ? exitSelecting() : setSelecting(true))}
+              className="text-ios-subhead text-ios-blue"
+            >
+              {selecting ? 'Done' : 'Select'}
+            </button>
+          )}
         >
           {(() => {
             if (activeTab === 'stock') {
-              if (data.stocks.length === 0) {
+              if (visibleStocks.length === 0) {
                 return <div className="p-8 text-center text-ios-secondary">No stocks added yet</div>;
               }
               return (
                 <>
-                  {[...data.stocks]
+                  {[...visibleStocks]
                     .sort((a, b) => {
                       const valueA = (a.currentPrice || a.purchasePrice) * a.shares;
                       const valueB = (b.currentPrice || b.purchasePrice) * b.shares;
@@ -1152,6 +1311,9 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                               <div className="truncate tabular-nums">
                                 {stock.shares.toFixed(2)} sh @ {formatCurrency(stock.purchasePrice, stock.currency)}
                               </div>
+                              {activeBroker === null && stock.broker && (
+                                <div className="truncate">{stock.broker}</div>
+                              )}
                               {hasCurrent && (
                                 <div className="truncate tabular-nums">
                                   Now {formatCurrency(stock.currentPrice!, stock.currency)}
@@ -1163,8 +1325,14 @@ export default function Investments({ data, setData, saveLocalData, baseCurrency
                           detail={hasCurrent && (
                             <GainDetail positive={gainLoss >= 0} percent={gainLossPercent} amount={formatCompactCurrency(convertedGainLoss, baseCurrency)} />
                           )}
-                          onClick={() => handleEdit('stock', stock)}
-                          accessory={rowActions('stock', stock)}
+                          onClick={() => (selecting ? toggleSelected(stock.id) : handleEdit('stock', stock))}
+                          accessory={selecting ? (
+                            <span className="shrink-0 ml-1" aria-hidden>
+                              {selectedIds.has(stock.id)
+                                ? <CheckCircle2 size={22} className="text-ios-blue" />
+                                : <Circle size={22} className="text-ios-tertiary" />}
+                            </span>
+                          ) : rowActions('stock', stock)}
                         />
                       );
                     })}

@@ -1,4 +1,4 @@
-import { AppData, Currency, Expense } from '../types';
+import { AppData, Currency, Expense, Stock } from '../types';
 import { convertCurrency } from './currency';
 
 export const calculateNetWorth = (data: AppData, targetCurrency: Currency): number => {
@@ -208,6 +208,45 @@ export const calculateAssetAllocation = (data: AppData, targetCurrency: Currency
   ];
 
   return raw.filter(a => a.value > 0).sort((a, b) => b.value - a.value);
+};
+
+export interface BrokerGroup {
+  /** Display name ('' = stocks with no broker set). */
+  broker: string;
+  value: number;
+  invested: number;
+  gain: number;
+  count: number;
+}
+
+/** Same broker regardless of case or stray spaces ("hapi " = "Hapi"). */
+export const brokerKey = (broker?: string) => (broker ?? '').trim().toLowerCase();
+
+/** Stock holdings totalled per broker, largest value first. */
+export const groupStocksByBroker = (stocks: Stock[], targetCurrency: Currency): BrokerGroup[] => {
+  const groups = new Map<string, BrokerGroup>();
+  stocks.forEach(s => {
+    const key = brokerKey(s.broker);
+    const group = groups.get(key) ?? { broker: (s.broker ?? '').trim(), value: 0, invested: 0, gain: 0, count: 0 };
+    group.value += convertCurrency((s.currentPrice || s.purchasePrice) * s.shares, s.currency, targetCurrency);
+    group.invested += convertCurrency(s.purchasePrice * s.shares, s.currency, targetCurrency);
+    group.gain = group.value - group.invested;
+    group.count += 1;
+    groups.set(key, group);
+  });
+  return [...groups.values()].sort((a, b) => b.value - a.value);
+};
+
+/** Files the stocks in `ids` under `broker`; a blank name clears it. */
+export const assignBroker = (stocks: Stock[], ids: Set<string>, broker: string): Stock[] => {
+  const name = broker.trim();
+  return stocks.map(s => {
+    if (!ids.has(s.id)) return s;
+    const next = { ...s };
+    if (name) next.broker = name;
+    else delete next.broker;
+    return next;
+  });
 };
 
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {

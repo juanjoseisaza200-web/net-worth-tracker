@@ -80,6 +80,8 @@ export interface Stock {
   purchasePrice: number;
   currentPrice?: number;
   currency: Currency;
+  /** Where the shares are held (e.g. "Hapi"); unset = unassigned. */
+  broker?: string;
 }
 
 export interface Crypto {

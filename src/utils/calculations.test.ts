@@ -8,6 +8,8 @@ import {
   calculateCategoryBreakdown,
   calculateCurrencyExposure,
   roundAccountBalances,
+  groupStocksByBroker,
+  assignBroker,
 } from './calculations';
 import { Expense } from '../types';
 
@@ -142,5 +144,57 @@ describe('roundAccountBalances', () => {
     const data = baseData();
     data.accounts[0].balance = 1577772.5;
     expect(roundAccountBalances(data)).toBe(data);
+  });
+});
+
+describe('groupStocksByBroker', () => {
+  const stock = (id: string, broker: string | undefined, shares: number, buy: number, now?: number) =>
+    ({ id, symbol: id, shares, purchasePrice: buy, currentPrice: now, currency: 'USD' as const, ...(broker !== undefined ? { broker } : {}) });
+
+  it('totals value, invested and gain per broker, largest first', () => {
+    const groups = groupStocksByBroker([
+      stock('A', 'Hapi', 10, 5, 7),   // 70 now, 50 invested
+      stock('B', 'IBKR', 1, 100, 90), // 90 now, 100 invested
+      stock('C', 'Hapi', 2, 10),      // no current price: 20 now, 20 invested
+    ], 'USD');
+    expect(groups.map(g => g.broker)).toEqual(['Hapi', 'IBKR']);
+    expect(groups[0]).toMatchObject({ value: 90, invested: 70, gain: 20, count: 2 });
+    expect(groups[1]).toMatchObject({ value: 90 - 0, invested: 100, gain: -10, count: 1 });
+  });
+
+  it('treats a missing or blank broker as one unassigned group and matches names ignoring case/spaces', () => {
+    const groups = groupStocksByBroker([
+      stock('A', undefined, 1, 10),
+      stock('B', '  ', 1, 10),
+      stock('C', 'hapi ', 1, 30),
+      stock('D', 'Hapi', 1, 30),
+    ], 'USD');
+    expect(groups).toHaveLength(2);
+    expect(groups[0]).toMatchObject({ broker: 'hapi', value: 60, count: 2 });
+    expect(groups[1]).toMatchObject({ broker: '', value: 20, count: 2 });
+  });
+
+  it('converts each holding to the target currency', () => {
+    const groups = groupStocksByBroker([{ ...stock('A', 'Hapi', 1, 10), currency: 'COP' }], 'COP');
+    expect(groups[0].value).toBe(10);
+  });
+});
+
+describe('assignBroker', () => {
+  const stocks = [
+    { id: 'a', symbol: 'A', shares: 1, purchasePrice: 1, currency: 'USD' as const, broker: 'Old' },
+    { id: 'b', symbol: 'B', shares: 1, purchasePrice: 1, currency: 'USD' as const },
+    { id: 'c', symbol: 'C', shares: 1, purchasePrice: 1, currency: 'USD' as const, broker: 'Keep' },
+  ];
+
+  it('sets the trimmed broker on the selected stocks only', () => {
+    const out = assignBroker(stocks, new Set(['a', 'b']), '  Hapi ');
+    expect(out.map(s => s.broker)).toEqual(['Hapi', 'Hapi', 'Keep']);
+  });
+
+  it('clears the broker (no empty field left behind) when the name is blank', () => {
+    const out = assignBroker(stocks, new Set(['a']), '   ');
+    expect('broker' in out[0]).toBe(false);
+    expect(out[2].broker).toBe('Keep');
   });
 });
