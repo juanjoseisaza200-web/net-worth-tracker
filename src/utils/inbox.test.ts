@@ -368,3 +368,42 @@ describe('sanitizeInboxItem', () => {
     expect(sanitizeInboxItem('x', { source: 'email', text: 'hi' })).toBeNull();
   });
 });
+
+describe('subscription charges by SMS', () => {
+  const netflixSms: InboxItem = {
+    id: 'nf1',
+    source: 'sms',
+    text: 'Bancolombia: Compraste COP44.900,00 en NETFLIX.COM con tu T.Cred *1342, el 20/09/2026 a las 03:10. Si tienes dudas, encuentranos aqui: 6045109095 o 018000931987. Estamos cerca.',
+  };
+  const withNetflix = (): AppData => ({
+    ...baseData(),
+    subscriptions: [{
+      id: 'netflix', name: 'Netflix', amount: 40000, currency: 'COP', accountId: 'card', category: 'Entertainment',
+      frequency: 'monthly', billingDay: 20, isActive: true, smsMatch: 'netflix', lastChargedPeriod: '2026-08',
+    }],
+  });
+
+  it('books a matching card SMS as the subscription payment instead of sending it to review', () => {
+    const result = processInbox(withNetflix(), [netflixSms]);
+    expect(result.pending).toEqual([]);
+    expect(result.deleteIds).toEqual(['nf1']);
+    expect(result.data.expenses).toEqual([expect.objectContaining({
+      id: 'inbox-nf1', amount: 44900, description: 'Netflix', category: 'Entertainment',
+      subscription: { id: 'netflix', period: '2026-09' },
+    })]);
+    expect(result.data.accounts[0].balance).toBe(-144900);
+    expect(isRecordedIn(result.data, 'nf1')).toBe(true);
+  });
+
+  it('is not booked twice when the item is processed again', () => {
+    const once = processInbox(withNetflix(), [netflixSms]).data;
+    const again = processInbox(once, [netflixSms]);
+    expect(again.data).toBe(once);
+    expect(again.deleteIds).toEqual(['nf1']);
+  });
+
+  it('leaves non-matching purchases for review', () => {
+    const result = processInbox(withNetflix(), [creditSms('s1')]);
+    expect(result.pending).toHaveLength(1);
+  });
+});

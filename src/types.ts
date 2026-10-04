@@ -52,6 +52,8 @@ export interface Expense {
   date: string;
   accountId: string;
   capture?: CaptureInfo;
+  /** Set on a subscription charge: which subscription and billing period it pays. */
+  subscription?: { id: string; period: string };
 }
 
 export interface Income {
@@ -74,6 +76,30 @@ export interface RecurringIncome {
   isActive: boolean;
   accountId?: string;
   lastRunMonth?: string; // YYYY-MM format to track when it was last processed
+}
+
+export interface Subscription {
+  id: string;
+  name: string;
+  amount: number;
+  currency: Currency;
+  /** Account or card it's charged to. */
+  accountId: string;
+  category: string;
+  frequency: 'monthly' | 'yearly';
+  /** Day of the month it's charged (1-31; clamped to short months). */
+  billingDay: number;
+  /** yearly only: month it's charged (1-12). */
+  billingMonth?: number;
+  isActive: boolean;
+  /**
+   * Text that identifies its charge in the bank SMS (e.g. "NETFLIX"). When
+   * set, the SMS books the charge with the real amount; the scheduled charge
+   * waits a few days for it and is replaced if the SMS comes late.
+   */
+  smsMatch?: string;
+  /** Last billing period charged: 'YYYY-MM' (monthly) or 'YYYY' (yearly). */
+  lastChargedPeriod?: string;
 }
 
 export interface Stock {
@@ -168,6 +194,7 @@ export interface AppData {
   expenses: Expense[];
   incomes: Income[];
   recurringIncomes: RecurringIncome[];
+  subscriptions?: Subscription[];
   automations?: Automation[];
   activityLogs?: ActivityLog[];
   stocks: Stock[];

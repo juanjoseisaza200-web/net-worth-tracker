@@ -2,6 +2,7 @@ import { Account, AppData, Currency, Expense, Income } from '../types';
 import { convertCurrency } from './currency';
 import { expenseCategories } from './categories';
 import { parseBancolombiaSms, parseSmsAmount } from './bancolombiaSms';
+import { claimSubscriptionCharge } from './subscriptions';
 
 /**
  * Automatic capture: the iPhone shortcuts drop raw items into
@@ -12,6 +13,8 @@ import { parseBancolombiaSms, parseSmsAmount } from './bancolombiaSms';
  *   (same account, same amount, within PAIR_WINDOW_MS) and dropped, so a
  *   purchase is never counted twice — while two identical purchases minutes
  *   apart (a split bill) still get one SMS each.
+ * - A card SMS whose merchant matches a subscription's `smsMatch` is booked
+ *   as that subscription's charge (see claimSubscriptionCharge).
  * - Everything else waits in the review queue.
  *
  * - An Apple Pay item with no amount is a "note": the shortcut only sends the
@@ -338,6 +341,21 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
           continue;
         }
         if (note.description) noteDescription = note.description;
+      }
+
+      // A subscription's monthly/yearly card charge pays that subscription.
+      const claimed = account && !note && claimSubscriptionCharge(data, {
+        itemId: item.id,
+        merchant: sms.counterparty,
+        accountId: account.id,
+        amount: sms.amount,
+        currency: sms.currency,
+        date: sms.date,
+      });
+      if (claimed) {
+        data = claimed;
+        deleteIds.push(item.id);
+        continue;
       }
     }
 

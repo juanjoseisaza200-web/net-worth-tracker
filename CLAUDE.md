@@ -47,6 +47,8 @@ Separately, `App.tsx` keeps a `viewCurrencies` map (one entry per tab) distinct 
 
 `processAutomations` in `utils/automations.ts` is a pure function `(data: AppData) => { newData, messages }` covering two things: scheduled `Automation`s (`sweep`/`transfer` between accounts) and `RecurringIncome` deposits. Each tracks its own `lastRunMonth` (`YYYY-MM`) to avoid double-firing; a `dayOfMonth` of `0` means "last day of the month." Because this only runs when data is loaded/synced (see above), it's an at-most-once-per-session check, not a real cron — don't assume it fires exactly on the scheduled day if the app isn't open.
 
+`processSubscriptions` (`utils/subscriptions.ts`) runs right after it on the same server snapshots: each `Subscription` books its due charges as expenses (catching up every missed period via `lastChargedPeriod`). One with `smsMatch` is normally paid by its bank SMS through the capture inbox (`claimSubscriptionCharge`), so its scheduled charge waits 3 days and is replaced if the SMS arrives late.
+
 ### Component structure
 
 Each route is one large, mostly self-contained component under `src/components` (`Dashboard`, `Accounts`, `Expenses`, `Investments`, `Debts`, `Settings`, `Login`, `Header` — ranging from ~150 to ~1500 lines). They manage their own local form/modal state inline rather than sharing form or modal primitives. `AutocompleteInput.tsx` is the one genuinely reusable component (debounced symbol search used by both stock and crypto forms in `Investments.tsx`).

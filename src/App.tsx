@@ -93,7 +93,9 @@ function App() {
               // interest, then run scheduled automations / recurring incomes.
               // Both return the same reference when nothing changes.
               const accrued = accrueFixedIncome(cloudData);
-              const { newData: automated, messages } = (await import('./utils/automations')).processAutomations(accrued);
+              const { newData: automatedRaw, messages: automationMessages } = (await import('./utils/automations')).processAutomations(accrued);
+              const { newData: automated, messages: subscriptionMessages } = (await import('./utils/subscriptions')).processSubscriptions(automatedRaw);
+              const messages = [...automationMessages, ...subscriptionMessages];
               // Same reference when nothing needed rounding, so the check below still works.
               const newData = roundAccountBalances(automated);
 

@@ -13,6 +13,7 @@ import ChartErrorBoundary from './ChartErrorBoundary';
 import { Section, Row, Switch, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
 import { useIosColors } from '../utils/useIosColors';
+import Subscriptions from './Subscriptions';
 
 interface ExpensesProps {
   data: AppData;
@@ -21,7 +22,7 @@ interface ExpensesProps {
   onCurrencyChange: (currency: Currency) => void;
 }
 
-type ViewMode = 'expenses' | 'income' | 'recurring';
+type ViewMode = 'expenses' | 'income' | 'recurring' | 'subscriptions';
 type ExpensePeriod = 'all' | 'month' | 'fortnight';
 
 const PERIOD_OPTIONS: { id: ExpensePeriod; label: string }[] = [
@@ -136,8 +137,9 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         expenses: data.expenses.map(exp =>
           exp.id === editingExpense.id
             // Keep `capture`: it pairs an Apple Pay expense with its bank SMS;
-            // dropping it makes that SMS show up for review again.
-            ? { ...expenseForm, id: exp.id, amount, ...(exp.capture ? { capture: exp.capture } : {}) }
+            // dropping it makes that SMS show up for review again. Keep
+            // `subscription` too: it marks which billing period it paid.
+            ? { ...expenseForm, id: exp.id, amount, ...(exp.capture ? { capture: exp.capture } : {}), ...(exp.subscription ? { subscription: exp.subscription } : {}) }
             : exp
         ),
       });
@@ -781,6 +783,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               { value: 'expenses', label: 'Expenses' },
               { value: 'income', label: 'Income' },
               { value: 'recurring', label: 'Recurring' },
+              { value: 'subscriptions', label: 'Subs' },
             ]}
             value={viewMode}
             onChange={(id) => {
@@ -909,8 +912,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
           </div>
         )}
 
+        {viewMode === 'subscriptions' && <Subscriptions data={data} setData={setData} baseCurrency={baseCurrency} />}
+
         {/* Add Button: above the chart so it's reachable without scrolling */}
-        {!showForm && (
+        {!showForm && viewMode !== 'subscriptions' && (
           <button
             onClick={() => {
               setShowForm(true);
@@ -931,7 +936,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
         {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
         <div ref={formRef} className="scroll-mt-16 empty:hidden">
-          {renderForm()}
+          {viewMode !== 'subscriptions' && renderForm()}
         </div>
 
         {/* Spending-by-category chart (expenses) */}
