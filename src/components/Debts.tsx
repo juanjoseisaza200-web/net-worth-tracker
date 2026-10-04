@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { Plus, ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import { AppData, Currency, Debt } from '../types';
 import { formatCurrency, formatCurrencyTrimmed, formatAdaptiveCurrency, convertCurrency } from '../utils/currency';
+import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
+import NumericInput from './NumericInput';
 import { PageTitle, Section, Row, Segmented } from './ios';
 import { ios } from './iosStyles';
 
@@ -59,11 +61,16 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    const parsedAmount = parseAmount(amount);
+    if (parsedAmount === null || parsedAmount <= 0) {
+      alert('Please enter a valid amount greater than 0.');
+      return;
+    }
     const newDebt: Debt = {
       id: editingDebt ? editingDebt.id : Date.now().toString(),
       type,
       personName,
-      amount: parseFloat(amount) || 0,
+      amount: parsedAmount,
       currency,
       description,
       dueDate
@@ -221,13 +228,10 @@ export default function Debts({ data, setData, baseCurrency, onCurrencyChange }:
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={ios.label}>Amount</label>
-                    <input
-                      type="number"
-                      required
-                      min="0.01"
-                      step="0.01"
+                    <NumericInput
                       value={amount}
-                      onChange={e => setAmount(e.target.value)}
+                      onValueChange={(val) => setAmount(val)}
+                      required
                       className={ios.input}
                       placeholder="0.00"
                     />

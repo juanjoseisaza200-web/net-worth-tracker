@@ -2,11 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { Plus, Wallet, ArrowRightLeft, Trash2, CreditCard, Landmark, PiggyBank, Banknote, Repeat } from 'lucide-react';
 import { AppData, Account, AccountType, Currency, Automation, ActivityLog, Income } from '../types';
 import { formatCurrency, formatCurrencyTrimmed, formatCompactCurrency, convertCurrency } from '../utils/currency';
-import { parseAmount, groupThousands, ungroupTyped, toEditableAmount } from '../utils/number';
+import { parseAmount, toEditableAmount } from '../utils/number';
 import { resolveEditedBalance } from '../utils/sync';
 import { formatDateForDisplay, getOrdinalSuffix } from '../utils/date';
 import { DEFAULT_STATEMENT_DAY, getCardStatement, sumCardPayments, sumInCurrency } from '../utils/creditCard';
 import CurrencySelect from './CurrencySelect';
+import NumericInput from './NumericInput';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
 
@@ -528,19 +529,12 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                     <label className={ios.label}>
                                         Amount ({account.currency})
                                     </label>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
+                                    <NumericInput
+                                        value={paymentForm.amount}
+                                        onValueChange={(val) => setPaymentForm({ ...paymentForm, amount: val })}
                                         lang="en-US"
                                         required
                                         autoFocus
-                                        value={paymentForm.amount}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(',', '.');
-                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                setPaymentForm({ ...paymentForm, amount: val });
-                                            }
-                                        }}
                                         className={ios.input}
                                         placeholder="0.00"
                                     />
@@ -727,12 +721,10 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                 {automationForm.type === 'transfer' ? (
                                     <div>
                                         <label className={ios.label}>Transfer Amount</label>
-                                        <input
-                                            type="text"
-                                            inputMode="decimal"
-                                            required
+                                        <NumericInput
                                             value={automationForm.amount}
-                                            onChange={(e) => setAutomationForm({ ...automationForm, amount: e.target.value.replace(',', '.') })}
+                                            onValueChange={(val) => setAutomationForm({ ...automationForm, amount: val })}
+                                            required
                                             className={ios.input}
                                             placeholder="735000"
                                         />
@@ -740,12 +732,10 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                 ) : (
                                     <div>
                                         <label className={ios.label}>Keep Amount in Source Account</label>
-                                        <input
-                                            type="text"
-                                            inputMode="decimal"
-                                            required
+                                        <NumericInput
                                             value={automationForm.keepAmount}
-                                            onChange={(e) => setAutomationForm({ ...automationForm, keepAmount: e.target.value.replace(',', '.') })}
+                                            onValueChange={(val) => setAutomationForm({ ...automationForm, keepAmount: val })}
+                                            required
                                             className={ios.input}
                                             placeholder="7500"
                                         />
@@ -887,19 +877,11 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                     <label className={ios.label}>
                                         {addForm.type === 'credit' ? 'Amount Currently Owed' : 'Initial Balance'}
                                     </label>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
+                                    <NumericInput
+                                        value={addForm.balance}
+                                        onValueChange={(val) => setAddForm({ ...addForm, balance: val })}
                                         lang="en-US"
                                         required
-                                        value={groupThousands(addForm.balance)}
-                                        onChange={(e) => {
-                                            // Shown with thousands separators; stored raw ("5305255.75").
-                                            const val = ungroupTyped(e.target.value, (e.nativeEvent as InputEvent).inputType?.startsWith('delete'));
-                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                setAddForm({ ...addForm, balance: val });
-                                            }
-                                        }}
                                         className={ios.input}
                                         placeholder="0.00"
                                     />
@@ -1002,18 +984,11 @@ export default function Accounts({ data, setData, baseCurrency, onCurrencyChange
                                     <label className={ios.label}>
                                         Amount (in {accounts.find(a => a.id === transferForm.fromAccountId)?.currency || 'source currency'})
                                     </label>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
+                                    <NumericInput
+                                        value={transferForm.amount}
+                                        onValueChange={(val) => setTransferForm({ ...transferForm, amount: val })}
                                         lang="en-US"
                                         required
-                                        value={transferForm.amount}
-                                        onChange={(e) => {
-                                            const val = e.target.value.replace(',', '.');
-                                            if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                                                setTransferForm({ ...transferForm, amount: val });
-                                            }
-                                        }}
                                         className={ios.input}
                                         placeholder="0.00"
                                     />

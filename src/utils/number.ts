@@ -42,3 +42,17 @@ export const ungroupTyped = (display: string, isDeletion = false): string => {
 /** Stored amount -> editable string, rounded to cents to drop float noise. */
 export const toEditableAmount = (amount: number): string =>
   String(Math.round(amount * 100) / 100);
+
+/**
+ * Caret index in a grouped display string that sits after `kept` non-comma
+ * characters (digits and "."), so reformatting doesn't jump the caret.
+ */
+export const caretInGrouped = (display: string, kept: number): number => {
+  if (kept <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < display.length; i++) {
+    if (display[i] !== ',') seen++;
+    if (seen === kept) return i + 1;
+  }
+  return display.length;
+};

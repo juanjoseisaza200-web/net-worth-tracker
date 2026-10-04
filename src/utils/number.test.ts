@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseAmount, groupThousands, ungroupTyped, toEditableAmount } from './number';
+import { parseAmount, groupThousands, ungroupTyped, toEditableAmount, caretInGrouped } from './number';
 
 describe('parseAmount', () => {
   it('parses plain and decimal numbers', () => {
@@ -79,5 +79,20 @@ describe('toEditableAmount', () => {
     expect(toEditableAmount(5305255.752083641)).toBe('5305255.75');
     expect(toEditableAmount(1577772)).toBe('1577772');
     expect(toEditableAmount(12.5)).toBe('12.5');
+  });
+});
+
+describe('caretInGrouped', () => {
+  it('keeps the caret after the same digit once commas are added or removed', () => {
+    // Typed "5" at the end of "1,234" -> "12345" shown as "12,345": caret at the end.
+    expect(caretInGrouped('12,345', 5)).toBe(6);
+    // Caret after the 2nd digit of "1234567" -> "1,234,567": after "1,2".
+    expect(caretInGrouped('1,234,567', 2)).toBe(3);
+    expect(caretInGrouped('1,234', 0)).toBe(0);
+  });
+
+  it('counts the decimal point as a character', () => {
+    expect(caretInGrouped('1,234.5', 5)).toBe(6);
+    expect(caretInGrouped('1,234.5', 6)).toBe(7);
   });
 });

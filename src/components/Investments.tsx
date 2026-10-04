@@ -11,6 +11,7 @@ import { parseAmount } from '../utils/number';
 import { applyPrices } from '../utils/sync';
 import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey } from '../utils/calculations';
 import CurrencySelect from './CurrencySelect';
+import NumericInput from './NumericInput';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
 
@@ -664,19 +665,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               {stockForm.inputMode === 'shares' ? (
                 <div>
                   <label className={ios.label}>Shares</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-
+                  <NumericInput
+                    value={stockForm.shares}
+                    onValueChange={(val) => setStockForm({ ...stockForm, shares: val })}
                     lang="en-US"
                     required
-                    value={stockForm.shares}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setStockForm({ ...stockForm, shares: val });
-                      }
-                    }}
                     className={ios.input}
                     placeholder="0.4"
                   />
@@ -684,19 +677,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               ) : (
                 <div>
                   <label className={ios.label}>Money Amount</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-
+                  <NumericInput
+                    value={stockForm.moneyAmount}
+                    onValueChange={(val) => setStockForm({ ...stockForm, moneyAmount: val })}
                     lang="en-US"
                     required
-                    value={stockForm.moneyAmount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setStockForm({ ...stockForm, moneyAmount: val });
-                      }
-                    }}
                     className={ios.input}
                     placeholder="30.00"
                   />
@@ -721,19 +706,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
                 <label className={ios.label}>
                   Purchase Price {stockForm.inputMode === 'money' && <span className="text-ios-caption2 text-ios-tertiary">(required for calculation)</span>}
                 </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
+                <NumericInput
+                  value={stockForm.purchasePrice}
+                  onValueChange={(val) => setStockForm({ ...stockForm, purchasePrice: val })}
                   lang="en-US"
                   required
-                  value={stockForm.purchasePrice}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setStockForm({ ...stockForm, purchasePrice: val });
-                    }
-                  }}
                   className={ios.input}
                   placeholder="Price per share"
                 />
@@ -743,18 +720,10 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
                   <span>Current Price (optional)</span>
                   {isFetchingPrice && <span className="text-ios-blue animate-pulse text-ios-caption2">Fetching price...</span>}
                 </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
-                  lang="en-US"
+                <NumericInput
                   value={stockForm.currentPrice}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setStockForm({ ...stockForm, currentPrice: val });
-                    }
-                  }}
+                  onValueChange={(val) => setStockForm({ ...stockForm, currentPrice: val })}
+                  lang="en-US"
                   className={ios.input}
                 />
                 {renderEstimatedPnL(stockForm.shares, stockForm.purchasePrice, stockForm.currentPrice)}
@@ -838,19 +807,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               {cryptoForm.inputMode === 'coins' ? (
                 <div>
                   <label className={ios.label}>Amount (Coins)</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-
+                  <NumericInput
+                    value={cryptoForm.amount}
+                    onValueChange={(val) => setCryptoForm({ ...cryptoForm, amount: val })}
                     lang="en-US"
                     required
-                    value={cryptoForm.amount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setCryptoForm({ ...cryptoForm, amount: val });
-                      }
-                    }}
                     className={ios.input}
                     placeholder="0.5"
                   />
@@ -858,19 +819,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               ) : (
                 <div>
                   <label className={ios.label}>Money Amount</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-
+                  <NumericInput
+                    value={cryptoForm.moneyAmount}
+                    onValueChange={(val) => setCryptoForm({ ...cryptoForm, moneyAmount: val })}
                     lang="en-US"
                     required
-                    value={cryptoForm.moneyAmount}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(',', '.');
-                      if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                        setCryptoForm({ ...cryptoForm, moneyAmount: val });
-                      }
-                    }}
                     className={ios.input}
                     placeholder="30.00"
                   />
@@ -895,19 +848,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
                 <label className={ios.label}>
                   Purchase Price {cryptoForm.inputMode === 'money' && <span className="text-ios-caption2 text-ios-tertiary">(required for calculation)</span>}
                 </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
+                <NumericInput
+                  value={cryptoForm.purchasePrice}
+                  onValueChange={(val) => setCryptoForm({ ...cryptoForm, purchasePrice: val })}
                   lang="en-US"
                   required
-                  value={cryptoForm.purchasePrice}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setCryptoForm({ ...cryptoForm, purchasePrice: val });
-                    }
-                  }}
                   className={ios.input}
                   placeholder="Price per coin"
                 />
@@ -917,18 +862,10 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
                   <span>Current Price (optional)</span>
                   {isFetchingPrice && <span className="text-ios-blue animate-pulse text-ios-caption2">Fetching price...</span>}
                 </label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
-                  lang="en-US"
+                <NumericInput
                   value={cryptoForm.currentPrice}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setCryptoForm({ ...cryptoForm, currentPrice: val });
-                    }
-                  }}
+                  onValueChange={(val) => setCryptoForm({ ...cryptoForm, currentPrice: val })}
+                  lang="en-US"
                   className={ios.input}
                 />
                 {renderEstimatedPnL(cryptoForm.amount, cryptoForm.purchasePrice, cryptoForm.currentPrice)}
@@ -984,18 +921,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={ios.label}>Amount</label>
-                    <input
-                      type="text"
-                      inputMode="decimal"
+                    <NumericInput
+                      value={fixedForm.amount}
+                      onValueChange={(val) => setFixedForm({ ...fixedForm, amount: val })}
                       lang="en-US"
                       required
-                      value={fixedForm.amount}
-                      onChange={(e) => {
-                        const val = e.target.value.replace(',', '.');
-                        if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                          setFixedForm({ ...fixedForm, amount: val });
-                        }
-                      }}
                       className={ios.input}
                     />
                   </div>
@@ -1013,19 +943,11 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={ios.label}>Interest Rate (%)</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
-
+                <NumericInput
+                  value={fixedForm.interestRate}
+                  onValueChange={(val) => setFixedForm({ ...fixedForm, interestRate: val })}
                   lang="en-US"
                   required
-                  value={fixedForm.interestRate}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setFixedForm({ ...fixedForm, interestRate: val });
-                    }
-                  }}
                   className={ios.input}
                 />
               </div>

@@ -9,6 +9,7 @@ import { formatDateForDisplay, getOrdinalSuffix, todayLocal } from '../utils/dat
 import { initialLastRunMonth } from '../utils/automations';
 import { parseAmount } from '../utils/number';
 import CurrencySelect from './CurrencySelect';
+import NumericInput from './NumericInput';
 import ChartErrorBoundary from './ChartErrorBoundary';
 import { Section, Row, Switch, PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
@@ -496,18 +497,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={ios.label}>Amount</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <NumericInput
+                  value={expenseForm.amount}
+                  onValueChange={(val) => setExpenseForm({ ...expenseForm, amount: val })}
                   lang="en-US"
                   required
-                  value={expenseForm.amount}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setExpenseForm({ ...expenseForm, amount: val });
-                    }
-                  }}
                   className={`${ios.input} tabular-nums`}
                   placeholder="0.00"
                 />
@@ -593,18 +587,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={ios.label}>Amount</label>
-                <input
-                  type="text"
-                  inputMode="decimal"
+                <NumericInput
+                  value={incomeForm.amount}
+                  onValueChange={(val) => setIncomeForm({ ...incomeForm, amount: val })}
                   lang="en-US"
                   required
-                  value={incomeForm.amount}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(',', '.');
-                    if (val === '' || /^\d*\.?\d*$/.test(val)) {
-                      setIncomeForm({ ...incomeForm, amount: val });
-                    }
-                  }}
                   className={`${ios.input} tabular-nums`}
                   placeholder="0.00"
                 />
@@ -688,14 +675,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={ios.label}>Amount</label>
-              <input
-                type="number"
-                inputMode="decimal"
-                required
-                step="0.01"
-                min="0"
+              <NumericInput
                 value={recurringForm.amount}
-                onChange={(e) => setRecurringForm({ ...recurringForm, amount: e.target.value })}
+                onValueChange={(val) => setRecurringForm({ ...recurringForm, amount: val })}
+                required
                 className={`${ios.input} tabular-nums`}
                 placeholder="0.00"
               />

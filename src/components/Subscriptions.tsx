@@ -7,6 +7,7 @@ import { formatDateForDisplay } from '../utils/date';
 import { parseAmount } from '../utils/number';
 import { initialChargedPeriod, monthlyCost, nextChargeDate } from '../utils/subscriptions';
 import CurrencySelect from './CurrencySelect';
+import NumericInput from './NumericInput';
 import { Section, Row, Switch } from './ios';
 import { ios } from './iosStyles';
 
@@ -188,12 +189,10 @@ export default function Subscriptions({ data, setData, baseCurrency }: Subscript
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={ios.label}>Amount</label>
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    required
+                  <NumericInput
                     value={form.amount}
-                    onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    onValueChange={(val) => setForm({ ...form, amount: val })}
+                    required
                     className={`${ios.input} tabular-nums`}
                     placeholder="0.00"
                   />
