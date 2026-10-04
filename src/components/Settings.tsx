@@ -2,7 +2,7 @@ import { User } from 'firebase/auth';
 import { RefreshCw, User as UserIcon, Download, Upload, Smartphone, Copy, TrendingUp, ArrowLeftRight } from 'lucide-react';
 import { useState, useRef } from 'react';
 import { AppData } from '../types';
-import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates } from '../utils/currency';
+import { isUsingLiveRates, lastExchangeRatesUpdate, fetchExchangeRates, convertCurrency, formatCurrency } from '../utils/currency';
 import { todayLocal } from '../utils/date';
 import { migrateData, generateInboxKey, registerInboxKey, unregisterInboxKey } from '../utils/storage';
 import { db } from '../firebase';
@@ -172,9 +172,17 @@ export default function Settings({ user, onLogout, onSync, data, setData }: Sett
                     <Row
                         icon={<IconSquare icon={ArrowLeftRight} color={isUsingLiveRates ? 'var(--ios-green)' : 'var(--ios-orange)'} />}
                         title="Exchange Rates"
-                        subtitle={isUsingLiveRates
-                            ? `Live (Updated ${lastExchangeRatesUpdate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
-                            : 'Using hardcoded fallbacks'}
+                        subtitle={
+                            <>
+                                {/* The rate the app is converting with right now (no extra fetch). */}
+                                <div className="truncate tabular-nums text-ios-label">1 USD = {formatCurrency(convertCurrency(1, 'USD', 'COP'), 'COP')}</div>
+                                <div className="truncate">
+                                    {isUsingLiveRates
+                                        ? `Live (Updated ${lastExchangeRatesUpdate?.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})`
+                                        : 'Using hardcoded fallbacks'}
+                                </div>
+                            </>
+                        }
                         accessory={
                             <button onClick={handleFetchRates} disabled={fetchingRates} className={ios.rowAction} aria-label="Refresh exchange rates">
                                 <RefreshCw size={18} className={fetchingRates ? 'animate-spin' : ''} />
