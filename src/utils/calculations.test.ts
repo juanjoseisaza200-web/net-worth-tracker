@@ -12,6 +12,8 @@ import {
   assignBroker,
   sortHoldings,
   HoldingSortKey,
+  portfolioPositions,
+  donutSlices,
 } from './calculations';
 import { Expense } from '../types';
 
@@ -237,5 +239,66 @@ describe('sortHoldings', () => {
     const copy = [...holdings];
     ids('value', 'asc');
     expect(holdings).toEqual(copy);
+  });
+});
+
+describe('portfolioPositions', () => {
+  const stock = (id: string, symbol: string, shares: number, buy: number, now: number, broker?: string) =>
+    ({ id, symbol, shares, purchasePrice: buy, currentPrice: now, currency: 'USD' as const, ...(broker ? { broker } : {}) });
+  const coin = (id: string, symbol: string, amount: number, buy: number, now: number) =>
+    ({ id, symbol, amount, purchasePrice: buy, currentPrice: now, currency: 'USD' as const });
+
+  const positions = portfolioPositions(
+    [stock('a', 'NVDA', 1, 100, 200, 'Hapi'), stock('b', 'nvda', 2, 150, 200, 'IBKR'), stock('c', 'AAPL', 1, 50, 40)],
+    [coin('x', 'BTC', 0.01, 50000, 70000)],
+    'USD',
+  );
+
+  it('merges the same symbol across brokers into one position', () => {
+    const nvda = positions.find(p => p.symbol === 'NVDA')!;
+    expect(nvda).toMatchObject({ kind: 'stock', units: 3, value: 600, invested: 400, gain: 200, lots: 2 });
+  });
+
+  it('ranks stocks and crypto together by value, with each one\'s share of the total', () => {
+    expect(positions.map(p => p.symbol)).toEqual(['BTC', 'NVDA', 'AAPL']);
+    const total = 700 + 600 + 40;
+    expect(positions[0]).toMatchObject({ kind: 'crypto', value: 700, invested: 500 });
+    expect(positions[0].share).toBeCloseTo(700 / total, 10);
+    expect(positions.reduce((s, p) => s + p.share, 0)).toBeCloseTo(1, 10);
+  });
+
+  it('keeps a stock and a coin with the same ticker apart', () => {
+    const both = portfolioPositions([stock('s', 'SOL', 1, 1, 1)], [coin('c', 'SOL', 1, 1, 1)], 'USD');
+    expect(both).toHaveLength(2);
+  });
+
+  it('is empty with no holdings', () => {
+    expect(portfolioPositions([], [], 'USD')).toEqual([]);
+  });
+});
+
+describe('donutSlices', () => {
+  const pos = (symbol: string, value: number) =>
+    ({ kind: 'stock' as const, symbol, units: 1, value, invested: value, gain: 0, share: 0, lots: 1 });
+
+  it('caps the slices, folding the smallest positions into Others', () => {
+    const slices = donutSlices([pos('A', 50), pos('B', 30), pos('C', 10), pos('D', 6), pos('E', 4)], 3);
+    expect(slices).toEqual([
+      { label: 'A', value: 50, share: 0.5 },
+      { label: 'B', value: 30, share: 0.3 },
+      { label: 'Others', value: 20, share: 0.2 },
+    ]);
+  });
+
+  it('does not add an Others slice when everything fits', () => {
+    expect(donutSlices([pos('A', 1), pos('B', 1)], 3).map(s => s.label)).toEqual(['A', 'B']);
+  });
+
+  it('never makes an Others slice of a single position', () => {
+    expect(donutSlices([pos('A', 3), pos('B', 2), pos('C', 1)], 3).map(s => s.label)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('is empty when nothing has value', () => {
+    expect(donutSlices([pos('A', 0)], 3)).toEqual([]);
   });
 });

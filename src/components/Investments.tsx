@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, ReactNode } from 'react';
-import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2, ArrowDown, ArrowUp } from 'lucide-react';
+import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2, ArrowDown, ArrowUp, PieChart } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -9,7 +9,10 @@ import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
 import { applyPrices } from '../utils/sync';
-import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey } from '../utils/calculations';
+import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey, portfolioPositions, donutSlices } from '../utils/calculations';
+import { PieChart as Donut, Pie, Cell, ResponsiveContainer } from 'recharts';
+import ChartErrorBoundary from './ChartErrorBoundary';
+import { useIosColors } from '../utils/useIosColors';
 import CurrencySelect from './CurrencySelect';
 import NumericInput from './NumericInput';
 import { Section, Row, IconSquare, PageTitle, Segmented } from './ios';
@@ -24,7 +27,7 @@ interface InvestmentsProps {
   onCurrencyChange: (tab: InvestmentType, currency: Currency) => void;
 }
 
-type InvestmentType = 'stock' | 'crypto' | 'fixed';
+type InvestmentType = 'stock' | 'crypto' | 'fixed' | 'all';
 
 const SORT_OPTIONS: { value: HoldingSortKey; label: string }[] = [
   { value: 'value', label: 'Value' },
@@ -49,10 +52,15 @@ const loadHoldingSort = (): Record<'stock' | 'crypto', HoldingSort> => {
   }
 };
 
+// Donut palette (iOS system color names, resolved by useIosColors); "Others" is always gray.
+const DONUT_COLORS = ['blue', 'purple', 'orange', 'green', 'teal', 'red', 'indigo'] as const;
+const DONUT_MAX_SLICES = 8;
+
 const TABS: { value: InvestmentType; label: string }[] = [
   { value: 'stock', label: 'Stocks' },
   { value: 'crypto', label: 'Crypto' },
   { value: 'fixed', label: 'Fixed' },
+  { value: 'all', label: 'All' },
 ];
 
 // The form's two-way input-mode toggles keep their own buttons (each carries
@@ -67,6 +75,8 @@ const badge = 'inline-block align-middle px-2 py-px rounded-full bg-ios-fill tex
 export default function Investments({ data, setData, saveLocalData, currencyFor, onCurrencyChange }: InvestmentsProps) {
   const [activeTab, setActiveTab] = useState<InvestmentType>('stock');
   const baseCurrency = currencyFor(activeTab);
+  const chartColors = useIosColors();
+  const [donutMode, setDonutMode] = useState<'percent' | 'amount'>('percent');
   const [holdingSort, setHoldingSort] = useState(loadHoldingSort);
   const updateHoldingSort = (tab: 'stock' | 'crypto', sort: HoldingSort) => {
     const next = { ...holdingSort, [tab]: sort };
@@ -1002,6 +1012,122 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
     </div>
   );
 
+  // "All" tab: stocks and crypto as one portfolio, biggest position first.
+  const renderAll = () => {
+    const positions = portfolioPositions(data.stocks, data.crypto, baseCurrency);
+    if (positions.length === 0) {
+      return <Section><div className="p-8 text-center text-ios-secondary">No stocks or crypto added yet</div></Section>;
+    }
+    const total = positions.reduce((sum, p) => sum + p.value, 0);
+    const invested = positions.reduce((sum, p) => sum + p.invested, 0);
+    const gain = total - invested;
+    const stockValue = positions.filter(p => p.kind === 'stock').reduce((sum, p) => sum + p.value, 0);
+    const split = [
+      { label: 'Stocks', value: stockValue, color: 'var(--ios-blue)' },
+      { label: 'Crypto', value: total - stockValue, color: 'var(--ios-purple)' },
+    ];
+    const units = (n: number) => String(Number(n.toFixed(6)));
+    const slices = donutSlices(positions, DONUT_MAX_SLICES).map((slice, i) => ({
+      ...slice,
+      color: slice.label === 'Others' ? chartColors.gray : chartColors[DONUT_COLORS[i % DONUT_COLORS.length]],
+    }));
+
+    return (
+      <>
+        {renderSummary('Stocks + Crypto', PieChart, 'var(--ios-indigo)', total, (
+          <>
+            <span className="text-ios-secondary tabular-nums">Invested: {formatCompactCurrency(invested, baseCurrency)}</span>
+            <span className={`font-semibold tabular-nums shrink-0 ${gain >= 0 ? 'text-ios-green' : 'text-ios-red'}`}>
+              {gain >= 0 ? '+' : ''}{formatCompactCurrency(gain, baseCurrency)}
+              {' '}({gain >= 0 ? '+' : ''}{invested > 0 ? ((gain / invested) * 100).toFixed(2) : '0.00'}%)
+            </span>
+          </>
+        ))}
+
+        {slices.length > 0 && (
+          <Section title="Portfolio Mix">
+            <div className="px-4 pt-4">
+              <ChartErrorBoundary>
+                <div className="relative">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <Donut>
+                      <Pie data={slices} dataKey="value" nameKey="label" cx="50%" cy="50%" innerRadius={62} outerRadius={90} paddingAngle={1.5} stroke="none" isAnimationActive={false}>
+                        {slices.map(slice => <Cell key={slice.label} fill={slice.color} />)}
+                      </Pie>
+                    </Donut>
+                  </ResponsiveContainer>
+                  {/* Total in the hole of the donut */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-ios-caption text-ios-secondary">Total</span>
+                    <span className="text-ios-headline tabular-nums">{formatCompactCurrency(total, baseCurrency)}</span>
+                  </div>
+                </div>
+              </ChartErrorBoundary>
+              <div className="py-3">
+                <Segmented
+                  options={[{ value: 'percent', label: '%' }, { value: 'amount', label: 'Amount' }]}
+                  value={donutMode}
+                  onChange={setDonutMode}
+                />
+              </div>
+            </div>
+            {slices.map(slice => (
+              <Row
+                key={slice.label}
+                icon={<div className="w-2.5 h-2.5 rounded-full ml-1" style={{ backgroundColor: slice.color }} />}
+                title={slice.label}
+                value={<span className="tabular-nums">
+                  {donutMode === 'percent' ? `${(slice.share * 100).toFixed(1)}%` : formatCompactCurrency(slice.value, baseCurrency)}
+                </span>}
+              />
+            ))}
+          </Section>
+        )}
+
+        <div className={`${ios.card} p-4 space-y-3`}>
+          <div className="flex h-2.5 rounded-full overflow-hidden bg-ios-fill">
+            {split.map(s => total > 0 && s.value > 0 && (
+              <div key={s.label} style={{ width: `${(s.value / total) * 100}%`, backgroundColor: s.color }} />
+            ))}
+          </div>
+          <div className="flex justify-between gap-3 text-ios-subhead">
+            {split.map(s => (
+              <div key={s.label} className="min-w-0">
+                <div className="flex items-center gap-1.5 text-ios-secondary">
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: s.color }} />
+                  {s.label} · {total > 0 ? ((s.value / total) * 100).toFixed(1) : '0.0'}%
+                </div>
+                <div className="font-semibold tabular-nums truncate">{formatCompactCurrency(s.value, baseCurrency)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Section title="Positions" footer="Largest first. The same symbol held in several places counts as one position.">
+          {positions.map((p, i) => (
+            <Row
+              key={`${p.kind}-${p.symbol}`}
+              icon={<span className="w-6 text-center text-ios-footnote font-semibold text-ios-secondary tabular-nums">{i + 1}</span>}
+              title={<span className="font-semibold">{p.symbol}</span>}
+              subtitle={
+                <>
+                  <div className="truncate tabular-nums">
+                    {p.kind === 'stock' ? 'Stock' : 'Crypto'} · {units(p.units)} {p.kind === 'stock' ? 'sh' : 'coins'}{p.lots > 1 ? ` · ${p.lots} holdings` : ''}
+                  </div>
+                  <div className="truncate tabular-nums">{(p.share * 100).toFixed(1)}% of portfolio</div>
+                </>
+              }
+              value={<span className="font-semibold">{formatCompactCurrency(p.value, baseCurrency)}</span>}
+              detail={p.invested > 0 && (
+                <GainDetail positive={p.gain >= 0} percent={(p.gain / p.invested) * 100} amount={formatCompactCurrency(p.gain, baseCurrency)} />
+              )}
+            />
+          ))}
+        </Section>
+      </>
+    );
+  };
+
   return (
     <div
       className="px-4 pb-4 relative min-h-screen touch-pan-y"
@@ -1050,6 +1176,9 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
           />
         </div>
 
+        {activeTab === 'all' && renderAll()}
+
+        {activeTab !== 'all' && (<>
         {/* Summary */}
         {activeTab === 'stock' && visibleStocks.length > 0 && (() => {
           const totalCurrentValue = visibleStocks.reduce((sum, stock) => {
@@ -1428,6 +1557,7 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
             return null;
           })()}
         </Section>
+        </>)}
       </div>
     </div>
   );

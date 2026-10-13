@@ -1,4 +1,4 @@
-import { AppData, Currency, Expense, Stock } from '../types';
+import { AppData, Crypto, Currency, Expense, Stock } from '../types';
 import { convertCurrency } from './currency';
 
 export const calculateNetWorth = (data: AppData, targetCurrency: Currency): number => {
@@ -276,6 +276,68 @@ export const sortHoldings = <T extends { symbol: string; purchasePrice: number; 
     sign * (key === 'name'
       ? a.symbol.localeCompare(b.symbol, undefined, { sensitivity: 'base' })
       : metric(a) - metric(b)));
+};
+
+export interface Position {
+  kind: 'stock' | 'crypto';
+  symbol: string;
+  /** Shares or coins, summed over every lot (e.g. the same stock at two brokers). */
+  units: number;
+  value: number;
+  invested: number;
+  gain: number;
+  /** value / total value of all positions (0-1). */
+  share: number;
+  /** How many holdings were merged into this position. */
+  lots: number;
+}
+
+/**
+ * Stocks and crypto as one portfolio, largest position first. Holdings of the
+ * same symbol (ignoring case) are merged per kind, so a stock held at two
+ * brokers counts as the one position it really is.
+ */
+export const portfolioPositions = (stocks: Stock[], crypto: Crypto[], targetCurrency: Currency): Position[] => {
+  const merged = new Map<string, Omit<Position, 'share'>>();
+  const add = (kind: Position['kind'], h: { symbol: string; purchasePrice: number; currentPrice?: number; currency: Currency }, units: number) => {
+    const key = `${kind}:${h.symbol.trim().toUpperCase()}`;
+    const p = merged.get(key) ?? { kind, symbol: h.symbol.trim().toUpperCase(), units: 0, value: 0, invested: 0, gain: 0, lots: 0 };
+    p.units += units;
+    p.value += convertCurrency((h.currentPrice || h.purchasePrice) * units, h.currency, targetCurrency);
+    p.invested += convertCurrency(h.purchasePrice * units, h.currency, targetCurrency);
+    p.gain = p.value - p.invested;
+    p.lots += 1;
+    merged.set(key, p);
+  };
+  stocks.forEach(s => add('stock', s, s.shares));
+  crypto.forEach(c => add('crypto', c, c.amount));
+
+  const total = [...merged.values()].reduce((sum, p) => sum + p.value, 0);
+  return [...merged.values()]
+    .map(p => ({ ...p, share: total > 0 ? p.value / total : 0 }))
+    .sort((a, b) => b.value - a.value);
+};
+
+export interface DonutSlice {
+  label: string;
+  value: number;
+  /** value / total (0-1). */
+  share: number;
+}
+
+/**
+ * Chart slices for `positions` (largest first), at most `maxSlices` of them:
+ * when there are more positions, the largest `maxSlices - 1` keep their name
+ * and the rest fold into "Others", so the donut stays readable.
+ */
+export const donutSlices = (positions: Position[], maxSlices: number): DonutSlice[] => {
+  const withValue = positions.filter(p => p.value > 0);
+  const total = withValue.reduce((sum, p) => sum + p.value, 0);
+  if (total <= 0) return [];
+  const shown = withValue.length <= maxSlices ? withValue : withValue.slice(0, maxSlices - 1);
+  const slices = shown.map(p => ({ label: p.symbol, value: p.value, share: p.value / total }));
+  const rest = withValue.slice(shown.length).reduce((sum, p) => sum + p.value, 0);
+  return rest > 0 ? [...slices, { label: 'Others', value: rest, share: rest / total }] : slices;
 };
 
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {

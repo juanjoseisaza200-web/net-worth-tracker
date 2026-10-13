@@ -1,7 +1,7 @@
 export type Currency = 'USD' | 'COP';
 
 /** Screens (and Investments tabs) that each remember their own view currency. */
-export type ViewCurrencyKey = 'dashboard' | 'expenses' | 'accounts' | 'debts' | 'stock' | 'crypto' | 'fixed';
+export type ViewCurrencyKey = 'dashboard' | 'expenses' | 'accounts' | 'debts' | 'stock' | 'crypto' | 'fixed' | 'all';
 
 export type AccountType = 'checking' | 'savings' | 'cash' | 'credit' | 'other';
 
