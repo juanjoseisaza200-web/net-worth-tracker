@@ -158,7 +158,7 @@ export default function Dashboard({ data, setData, baseCurrency, onCurrencyChang
                         labelFormatter={(d) => formatDateForDisplay(d as string)}
                         contentStyle={{ background: 'var(--ios-card)', border: 'none', borderRadius: 12, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', color: 'var(--ios-label)' }}
                       />
-                      <Line type="monotone" dataKey="value" stroke={colors.blue} strokeWidth={2.5} dot={false} />
+                      <Line type="monotone" dataKey="value" stroke={colors.blue} strokeWidth={2.5} dot={false} isAnimationActive={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </ChartErrorBoundary>

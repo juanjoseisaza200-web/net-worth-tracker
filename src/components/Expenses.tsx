@@ -940,7 +940,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               <ChartErrorBoundary>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
-                    <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} stroke="none">
+                    <Pie data={categoryBreakdown} dataKey="value" nameKey="category" cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={2} stroke="none" isAnimationActive={false}>
                       {categoryBreakdown.map((entry, i) => (
                         <Cell key={entry.category} fill={chartColors[CATEGORY_COLORS[i % CATEGORY_COLORS.length]]} />
                       ))}

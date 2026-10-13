@@ -79,6 +79,10 @@
    (Safari never anchors, so this matches the iPhone everywhere). */
 html {
   overflow-anchor: none;
+  /* Every tap is a click: Safari otherwise waits to see whether two quick
+     taps are a double-tap zoom, and swallows the second one. Pinch zoom
+     still works. */
+  touch-action: manipulation;
 }
 
 /* iOS Safari draws date fields with its own native box, which ignores the
