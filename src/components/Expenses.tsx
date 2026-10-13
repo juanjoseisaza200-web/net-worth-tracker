@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, TrendingUp, TrendingDown, Calendar, Search, Hash, Repeat } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
@@ -69,13 +69,14 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   const [editingRecurring, setEditingRecurring] = useState<RecurringIncome | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
-  // Rows are tapped far down the list, but the edit form renders above it:
-  // bring the form into view whenever an entry is opened for editing.
+  // Income and recurring rows are tapped far down the list, but their edit
+  // form renders above it: bring the form into view. Expenses edit in place,
+  // right under the tapped row, so the screen doesn't move.
   useEffect(() => {
-    if (editingExpense || editingIncome || editingRecurring) {
+    if (editingIncome || editingRecurring) {
       formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }, [editingExpense, editingIncome, editingRecurring]);
+  }, [editingIncome, editingRecurring]);
   const chartColors = useIosColors();
 
   const [expenseForm, setExpenseForm] = useState({
@@ -307,6 +308,11 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   };
 
   const handleEditExpense = (expense: Expense) => {
+    // Tapping the open row again closes it.
+    if (editingExpense?.id === expense.id) {
+      resetForms();
+      return;
+    }
     setEditingExpense(expense);
     setExpenseForm({
       amount: expense.amount.toString(),
@@ -459,12 +465,14 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     setShowForm(false);
   };
 
-  const renderForm = () => {
+  // `inline`: the expense edit form, drawn under its row instead of up top.
+  const renderForm = (inline = false) => {
     if (!showForm) return null;
 
     if (viewMode === 'expenses') {
+      if (!!editingExpense !== inline) return null;
       return (
-        <div className={`${ios.card} p-4`}>
+        <div className={inline ? 'p-4 bg-ios-fill border-l-[3px] border-ios-blue' : `${ios.card} p-4`}>
           <h2 className="text-ios-headline mb-4 px-1">
             {editingExpense ? 'Edit Expense' : 'Add New Expense'}
           </h2>
@@ -898,9 +906,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         {viewMode === 'subscriptions' && <Subscriptions data={data} setData={setData} baseCurrency={baseCurrency} />}
 
         {/* Add Button: above the chart so it's reachable without scrolling */}
-        {!showForm && viewMode !== 'subscriptions' && (
+        {(!showForm || (viewMode === 'expenses' && editingExpense)) && viewMode !== 'subscriptions' && (
           <button
             onClick={() => {
+              if (viewMode === 'expenses' && editingExpense) resetForms(); // leave the in-place edit first
               setShowForm(true);
               if (viewMode === 'expenses') {
                 setEditingExpense(null);
@@ -997,8 +1006,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                     action={<span className="text-ios-footnote text-ios-secondary tabular-nums">{formatCurrencyTrimmed(group.total, baseCurrency)}</span>}
                   >
                     {group.expenses.map(expense => (
+                      <Fragment key={expense.id}>
                       <Row
-                        key={expense.id}
                         onClick={() => handleEditExpense(expense)}
                         title={expense.description}
                         subtitle={`${expense.category} · ${accountNameById(expense.accountId)}`}
@@ -1016,6 +1025,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                           </div>
                         }
                       />
+                      {editingExpense?.id === expense.id && renderForm(true)}
+                      </Fragment>
                     ))}
                   </Section>
                 ));
