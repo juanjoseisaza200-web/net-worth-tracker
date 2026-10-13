@@ -81,6 +81,23 @@ html {
   overflow-anchor: none;
 }
 
+/* iOS Safari draws date fields with its own native box, which ignores the
+   field's width (it overflows its column), is taller than other fields and
+   centres the date. Drop that box so the date looks like every other field;
+   tapping it still opens the native date picker. */
+input[type="date"] {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  min-width: 0;
+  min-height: 2.75rem;
+}
+
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  margin: 0;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Roboto',
