@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, ReactNode } from 'react';
-import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2, ArrowDown, ArrowUp, PieChart } from 'lucide-react';
+import { useState, useEffect, useRef, ReactNode, Fragment } from 'react';
+import { Plus, Trash2, TrendingUp, Building2, LineChart as LineChartIcon, Bitcoin, Percent, Circle, CheckCircle2, ArrowDown, ArrowUp, PieChart, ChevronDown } from 'lucide-react';
 import { AppData, Stock, Crypto, FixedIncome, Currency } from '../types';
 import { formatCurrency, formatCompactCurrency, convertCurrency } from '../utils/currency';
 
@@ -9,7 +9,7 @@ import { searchCryptoSymbols } from '../utils/cryptoSearch';
 import { fetchStockPrices, fetchCryptoPrices, fetchStockPrice, fetchCryptoPrice } from '../utils/priceFetcher';
 import { parseAmount } from '../utils/number';
 import { applyPrices } from '../utils/sync';
-import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey, portfolioPositions, donutSlices } from '../utils/calculations';
+import { groupStocksByBroker, brokerKey, assignBroker, sortHoldings, HoldingSortKey, portfolioPositions, donutSlices, mergeLots, MergedStock } from '../utils/calculations';
 import { PieChart as Donut, Pie, Cell, ResponsiveContainer } from 'recharts';
 import ChartErrorBoundary from './ChartErrorBoundary';
 import { useIosColors } from '../utils/useIosColors';
@@ -77,6 +77,8 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
   const baseCurrency = currencyFor(activeTab);
   const chartColors = useIosColors();
   const [donutMode, setDonutMode] = useState<'percent' | 'amount'>('percent');
+  // Stocks › All: merged rows (same stock at several brokers) opened to show each lot.
+  const [expandedStocks, setExpandedStocks] = useState<Set<string>>(new Set());
   const [holdingSort, setHoldingSort] = useState(loadHoldingSort);
   const updateHoldingSort = (tab: 'stock' | 'crypto', sort: HoldingSort) => {
     const next = { ...holdingSort, [tab]: sort };
@@ -1012,6 +1014,90 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
     </div>
   );
 
+  // One stock row. `nested` marks a single broker's lot shown under its merged row.
+  const renderStockRow = (stock: Stock, nested = false) => {
+    const currentPrice = stock.currentPrice || stock.purchasePrice;
+    const currentValue = currentPrice * stock.shares;
+    const purchaseValue = stock.purchasePrice * stock.shares;
+    const gainLoss = currentValue - purchaseValue;
+    const gainLossPercent = ((gainLoss / purchaseValue) * 100);
+
+    const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
+    const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
+    const hasCurrent = stock.currentPrice && stock.currentPrice !== stock.purchasePrice;
+
+    return (
+      <Row
+        key={stock.id}
+        icon={nested ? <span className="w-4" aria-hidden /> : undefined}
+        title={nested ? stock.broker || 'No Broker' : <span className="font-semibold">{stock.symbol}</span>}
+        subtitle={
+          <>
+            <div className="truncate tabular-nums">
+              {stock.shares.toFixed(2)} sh @ {formatCurrency(stock.purchasePrice, stock.currency)}
+            </div>
+            {activeBroker === null && !nested && stock.broker && (
+              <div className="truncate">{stock.broker}</div>
+            )}
+            {hasCurrent && (
+              <div className="truncate tabular-nums">
+                Now {formatCurrency(stock.currentPrice!, stock.currency)}
+              </div>
+            )}
+          </>
+        }
+        value={<span className="font-semibold">{formatCompactCurrency(convertedCurrentValue, baseCurrency)}</span>}
+        detail={hasCurrent && (
+          <GainDetail positive={gainLoss >= 0} percent={gainLossPercent} amount={formatCompactCurrency(convertedGainLoss, baseCurrency)} />
+        )}
+        onClick={() => (selecting ? toggleSelected(stock.id) : handleEdit('stock', stock))}
+        accessory={selecting ? (
+          <span className="shrink-0 ml-1" aria-hidden>
+            {selectedIds.has(stock.id)
+              ? <CheckCircle2 size={22} className="text-ios-blue" />
+              : <Circle size={22} className="text-ios-tertiary" />}
+          </span>
+        ) : rowActions('stock', stock)}
+      />
+    );
+  };
+
+  // The same stock held at several brokers, as one row: total shares at the
+  // weighted average cost. Tapping it shows each broker's lot to edit.
+  const renderMergedStock = (m: MergedStock) => {
+    const currentPrice = m.currentPrice || m.purchasePrice;
+    const value = currentPrice * m.shares;
+    const cost = m.purchasePrice * m.shares;
+    const gain = value - cost;
+    const open = expandedStocks.has(m.id);
+    const hasCurrent = m.currentPrice && m.currentPrice !== m.purchasePrice;
+    return (
+      <Fragment key={m.id}>
+        <Row
+          title={<span className="font-semibold">{m.symbol} <span className={badge}>{m.lots.length} brokers</span></span>}
+          subtitle={
+            <>
+              <div className="truncate tabular-nums">{m.shares.toFixed(2)} sh @ {formatCurrency(m.purchasePrice, m.currency)} avg</div>
+              {hasCurrent && <div className="truncate tabular-nums">Now {formatCurrency(m.currentPrice!, m.currency)}</div>}
+            </>
+          }
+          value={<span className="font-semibold">{formatCompactCurrency(convertCurrency(value, m.currency, baseCurrency), baseCurrency)}</span>}
+          detail={hasCurrent && cost > 0 && (
+            <GainDetail positive={gain >= 0} percent={(gain / cost) * 100} amount={formatCompactCurrency(convertCurrency(gain, m.currency, baseCurrency), baseCurrency)} />
+          )}
+          onClick={() => setExpandedStocks(prev => {
+            const next = new Set(prev);
+            if (next.has(m.id)) next.delete(m.id);
+            else next.add(m.id);
+            return next;
+          })}
+          accessory={<ChevronDown size={18} strokeWidth={2.5} className={`shrink-0 ml-1 text-ios-tertiary transition-transform ${open ? 'rotate-180' : ''}`} />}
+        />
+        {open && m.lots.map(lot => renderStockRow(lot, true))}
+      </Fragment>
+    );
+  };
+
   // "All" tab: stocks and crypto as one portfolio, biggest position first.
   const renderAll = () => {
     const positions = portfolioPositions(data.stocks, data.crypto, baseCurrency);
@@ -1400,52 +1486,12 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
               }
               return (
                 <>
-                  {sortHoldings(visibleStocks, s => s.shares, holdingSort.stock.key, holdingSort.stock.dir, baseCurrency)
-                    .map(stock => {
-                      const currentPrice = stock.currentPrice || stock.purchasePrice;
-                      const currentValue = currentPrice * stock.shares;
-                      const purchaseValue = stock.purchasePrice * stock.shares;
-                      const gainLoss = currentValue - purchaseValue;
-                      const gainLossPercent = ((gainLoss / purchaseValue) * 100);
-
-                      const convertedCurrentValue = convertCurrency(currentValue, stock.currency, baseCurrency);
-                      const convertedGainLoss = convertCurrency(gainLoss, stock.currency, baseCurrency);
-                      const hasCurrent = stock.currentPrice && stock.currentPrice !== stock.purchasePrice;
-
-                      return (
-                        <Row
-                          key={stock.id}
-                          title={<span className="font-semibold">{stock.symbol}</span>}
-                          subtitle={
-                            <>
-                              <div className="truncate tabular-nums">
-                                {stock.shares.toFixed(2)} sh @ {formatCurrency(stock.purchasePrice, stock.currency)}
-                              </div>
-                              {activeBroker === null && stock.broker && (
-                                <div className="truncate">{stock.broker}</div>
-                              )}
-                              {hasCurrent && (
-                                <div className="truncate tabular-nums">
-                                  Now {formatCurrency(stock.currentPrice!, stock.currency)}
-                                </div>
-                              )}
-                            </>
-                          }
-                          value={<span className="font-semibold">{formatCompactCurrency(convertedCurrentValue, baseCurrency)}</span>}
-                          detail={hasCurrent && (
-                            <GainDetail positive={gainLoss >= 0} percent={gainLossPercent} amount={formatCompactCurrency(convertedGainLoss, baseCurrency)} />
-                          )}
-                          onClick={() => (selecting ? toggleSelected(stock.id) : handleEdit('stock', stock))}
-                          accessory={selecting ? (
-                            <span className="shrink-0 ml-1" aria-hidden>
-                              {selectedIds.has(stock.id)
-                                ? <CheckCircle2 size={22} className="text-ios-blue" />
-                                : <Circle size={22} className="text-ios-tertiary" />}
-                            </span>
-                          ) : rowActions('stock', stock)}
-                        />
-                      );
-                    })}
+                  {activeBroker === null && !selecting
+                    // "All": one row per stock, lots at several brokers merged.
+                    ? sortHoldings(mergeLots(visibleStocks), m => m.shares, holdingSort.stock.key, holdingSort.stock.dir, baseCurrency)
+                      .map(m => (m.lots.length === 1 ? renderStockRow(m.lots[0]) : renderMergedStock(m)))
+                    : sortHoldings(visibleStocks, s => s.shares, holdingSort.stock.key, holdingSort.stock.dir, baseCurrency)
+                      .map(stock => renderStockRow(stock))}
                 </>
               );
             }

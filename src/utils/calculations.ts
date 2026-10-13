@@ -340,6 +340,43 @@ export const donutSlices = (positions: Position[], maxSlices: number): DonutSlic
   return rest > 0 ? [...slices, { label: 'Others', value: rest, share: rest / total }] : slices;
 };
 
+export interface MergedStock {
+  /** Id of the first lot, stable for React keys. */
+  id: string;
+  symbol: string;
+  shares: number;
+  /** Share-weighted average cost: total cost / total shares. */
+  purchasePrice: number;
+  currentPrice?: number;
+  currency: Currency;
+  /** The individual holdings (e.g. one per broker), in input order. */
+  lots: Stock[];
+}
+
+/**
+ * One row per stock: holdings of the same symbol (ignoring case) and currency
+ * are combined, e.g. MSFT at two brokers. Shares add up, the cost is the
+ * share-weighted average, so value and cost equal the sum of the lots.
+ */
+export const mergeLots = (stocks: Stock[]): MergedStock[] => {
+  const merged = new Map<string, MergedStock>();
+  stocks.forEach(s => {
+    const key = `${s.symbol.trim().toUpperCase()}|${s.currency}`;
+    const m = merged.get(key);
+    if (!m) {
+      merged.set(key, { id: s.id, symbol: s.symbol.trim().toUpperCase(), shares: s.shares, purchasePrice: s.purchasePrice, currentPrice: s.currentPrice, currency: s.currency, lots: [s] });
+      return;
+    }
+    const cost = m.purchasePrice * m.shares + s.purchasePrice * s.shares;
+    m.shares += s.shares;
+    m.purchasePrice = m.shares > 0 ? cost / m.shares : 0;
+    // Price refreshes write the same quote to every lot of a symbol.
+    m.currentPrice = s.currentPrice ?? m.currentPrice;
+    m.lots.push(s);
+  });
+  return [...merged.values()];
+};
+
 export const calculateTotalExpenses = (data: AppData, targetCurrency: Currency, period?: 'month' | 'year'): number => {
   const now = new Date();
   const currentYear = now.getFullYear();

@@ -14,6 +14,7 @@ import {
   HoldingSortKey,
   portfolioPositions,
   donutSlices,
+  mergeLots,
 } from './calculations';
 import { Expense } from '../types';
 
@@ -300,5 +301,38 @@ describe('donutSlices', () => {
 
   it('is empty when nothing has value', () => {
     expect(donutSlices([pos('A', 0)], 3)).toEqual([]);
+  });
+});
+
+describe('mergeLots', () => {
+  const lot = (id: string, symbol: string, shares: number, buy: number, now: number | undefined, broker: string, currency: 'USD' | 'COP' = 'USD') =>
+    ({ id, symbol, shares, purchasePrice: buy, currentPrice: now, currency, broker });
+
+  it('merges the same stock across brokers with a share-weighted average cost', () => {
+    const [msft] = mergeLots([lot('h', 'MSFT', 0.1, 400, 500, 'Hapi'), lot('i', 'msft', 0.3, 300, 500, 'IBKR')]);
+    expect(msft.symbol).toBe('MSFT');
+    expect(msft.shares).toBeCloseTo(0.4, 12);
+    // (0.1*400 + 0.3*300) / 0.4 = 325
+    expect(msft.purchasePrice).toBeCloseTo(325, 10);
+    expect(msft.currentPrice).toBe(500);
+    expect(msft.lots.map(l => l.id)).toEqual(['h', 'i']);
+    // Value and cost of the merged row equal the sum of the lots.
+    expect(msft.purchasePrice * msft.shares).toBeCloseTo(0.1 * 400 + 0.3 * 300, 10);
+  });
+
+  it('leaves single holdings as they are', () => {
+    const merged = mergeLots([lot('a', 'AAPL', 1, 100, 150, 'Hapi')]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ symbol: 'AAPL', shares: 1, purchasePrice: 100, currentPrice: 150 });
+    expect(merged[0].lots).toHaveLength(1);
+  });
+
+  it('keeps holdings in different currencies apart', () => {
+    expect(mergeLots([lot('a', 'X', 1, 1, 1, 'A', 'USD'), lot('b', 'X', 1, 1, 1, 'B', 'COP')])).toHaveLength(2);
+  });
+
+  it('uses the newest known price when one lot has none', () => {
+    const [x] = mergeLots([lot('a', 'X', 1, 10, undefined, 'A'), lot('b', 'X', 1, 20, 30, 'B')]);
+    expect(x.currentPrice).toBe(30);
   });
 });
