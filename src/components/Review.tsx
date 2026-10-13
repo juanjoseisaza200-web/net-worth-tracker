@@ -5,6 +5,9 @@ import { PendingEntry } from '../utils/inbox';
 import { expenseCategories, incomeCategories } from '../utils/categories';
 import { formatCurrency } from '../utils/currency';
 import { formatDateForDisplay } from '../utils/date';
+import { parseAmount } from '../utils/number';
+import NumericInput from './NumericInput';
+import CurrencySelect from './CurrencySelect';
 import { PageTitle, Segmented } from './ios';
 import { ios } from './iosStyles';
 
@@ -21,16 +24,23 @@ function PendingCard({ data, entry, onResolve }: { data: AppData; entry: Pending
         accountId: entry.accountId,
         category: entry.category,
         description: entry.description,
+        // Editable only for an unrecognised SMS, whose amount is a best guess.
+        amount: String(entry.amount),
+        currency: entry.currency,
     });
     const [busy, setBusy] = useState(false);
     const categories = form.kind === 'income' ? incomeCategories : expenseCategories;
-    const canSave = form.accountId !== '' && categories.includes(form.category) && form.description.trim() !== '';
+    const amount = entry.rawText ? parseAmount(form.amount) : entry.amount;
+    const canSave = form.accountId !== '' && categories.includes(form.category) && form.description.trim() !== ''
+        && amount !== null && amount > 0;
 
     const resolve = async (book: boolean) => {
         if (!book && !window.confirm('Discard this captured transaction? Nothing will be recorded.')) return;
         setBusy(true);
         try {
-            await onResolve(entry.itemId, book ? { ...entry, ...form, description: form.description.trim() } : null);
+            await onResolve(entry.itemId, book
+                ? { ...entry, ...form, amount: amount!, description: form.description.trim() }
+                : null);
         } catch (err) {
             console.error('Failed to resolve captured transaction', err);
             alert('Could not save. Check your connection and try again.');
@@ -43,7 +53,7 @@ function PendingCard({ data, entry, onResolve }: { data: AppData; entry: Pending
             <div className="flex items-start justify-between gap-3">
                 <div>
                     <div className={`font-rounded text-ios-title2 font-bold tabular-nums ${form.kind === 'income' ? 'text-ios-green' : ''}`}>
-                        {form.kind === 'income' ? '+' : '−'}{formatCurrency(entry.amount, entry.currency)}
+                        {form.kind === 'income' ? '+' : '−'}{formatCurrency(amount ?? 0, entry.rawText ? form.currency : entry.currency)}
                     </div>
                     <div className="text-ios-footnote text-ios-secondary flex items-center gap-1 mt-0.5">
                         {entry.origin === 'applepay' ? <Smartphone size={12} /> : <MessageSquare size={12} />}
@@ -54,6 +64,22 @@ function PendingCard({ data, entry, onResolve }: { data: AppData; entry: Pending
                     {entry.reason}
                 </span>
             </div>
+
+            {entry.rawText && (
+                <>
+                    <p className="p-3 rounded-xl bg-ios-fill text-ios-footnote text-ios-secondary">{entry.rawText}</p>
+                    <div className="grid grid-cols-2 gap-2">
+                        <NumericInput
+                            value={form.amount}
+                            onValueChange={(val) => setForm({ ...form, amount: val })}
+                            className={`${ios.input} tabular-nums`}
+                            placeholder="Amount"
+                            aria-label="Amount"
+                        />
+                        <CurrencySelect value={form.currency} onChange={(c) => setForm({ ...form, currency: c })} className={ios.select} />
+                    </div>
+                </>
+            )}
 
             <Segmented
                 value={form.kind}

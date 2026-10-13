@@ -1,7 +1,7 @@
 import { Account, AppData, Currency, Expense, Income } from '../types';
 import { convertCurrency } from './currency';
 import { expenseCategories } from './categories';
-import { parseBancolombiaSms, parseSmsAmount } from './bancolombiaSms';
+import { parseBancolombiaSms, parseLooseSms, parseSmsAmount } from './bancolombiaSms';
 import { claimSubscriptionCharge } from './subscriptions';
 
 /**
@@ -59,6 +59,8 @@ export interface PendingEntry {
   reason: string;
   /** applepay: ISO time of the tap, kept so the booked expense can still pair with its SMS. */
   capturedAt?: string;
+  /** sms in a format the parser doesn't know: the full text, shown so the amount can be checked. */
+  rawText?: string;
 }
 
 export interface InboxResult {
@@ -278,8 +280,35 @@ export const processInbox = (input: AppData, items: InboxItem[]): InboxResult =>
   for (const { item, sms } of smsItems) {
     // Confirmed from the review queue; the delete just hasn't landed yet.
     const bookedId = `inbox-${item.id}`;
-    if (!sms || data.expenses.some(e => e.id === bookedId) || data.incomes.some(i => i.id === bookedId)) {
+    if (data.expenses.some(e => e.id === bookedId) || data.incomes.some(i => i.id === bookedId)) {
       deleteIds.push(item.id);
+      continue;
+    }
+    if (!sms) {
+      // A format we don't know yet (the bank rewords messages). If it mentions
+      // money, let the user book it rather than losing it; otherwise it's a
+      // code or an ad.
+      const loose = parseLooseSms(item.text || '');
+      if (!loose) {
+        deleteIds.push(item.id);
+        continue;
+      }
+      const { date, time } = localDateTime(new Date());
+      const looseAccount = findAccount(data.accounts, loose.last4);
+      pending.push({
+        itemId: item.id,
+        origin: 'sms',
+        kind: loose.kind,
+        amount: loose.amount,
+        currency: loose.currency,
+        description: '',
+        category: '',
+        date: loose.date ?? date,
+        time: loose.time ?? time,
+        accountId: looseAccount?.id ?? '',
+        reason: 'SMS not recognised — check the amount',
+        rawText: item.text,
+      });
       continue;
     }
     const account = findAccount(data.accounts, sms.last4);

@@ -407,3 +407,60 @@ describe('subscription charges by SMS', () => {
     expect(result.pending).toHaveLength(1);
   });
 });
+
+describe('subscription SMS worded with the card at the end', () => {
+  it('books the ChatGPT charge at its USD price, not the COP equivalent the SMS shows', () => {
+    const data: AppData = {
+      ...baseData(),
+      subscriptions: [{
+        id: 'gpt', name: 'Chat GPT', amount: 6.74, currency: 'USD', accountId: 'card', category: 'Entertainment',
+        frequency: 'monthly', billingDay: 12, isActive: true, smsMatch: 'CHATGPT SUBS', lastChargedPeriod: '2026-09',
+      }],
+    };
+    const sms: InboxItem = {
+      id: 'gpt1',
+      source: 'sms',
+      text: 'Bancolombia: Compraste COP20.900,00 en OPENAI *CHATGPT SUBS, el 12/10/2026 a las 16:39. Esta compra esta asociada a T.Cred *1342. Si tienes dudas, encuentranos aqui: 018000931987. Siempre contigo.',
+    };
+    const result = processInbox(data, [sms]);
+    expect(result.pending).toEqual([]);
+    expect(result.data.expenses).toEqual([expect.objectContaining({
+      id: 'inbox-gpt1', amount: 6.74, currency: 'USD', description: 'Chat GPT', date: '2026-10-12',
+      accountId: 'card', subscription: { id: 'gpt', period: '2026-10' },
+    })]);
+    // The COP card is charged the USD price converted at the app's rate.
+    expect(result.data.accounts[0].balance).toBeCloseTo(-100000 - 6.74 / 0.00024, 2);
+    expect(result.data.subscriptions![0].lastChargedPeriod).toBe('2026-10');
+  });
+});
+
+describe('SMS the parser does not recognise', () => {
+  it('sends a purchase-looking message to review with its text and a best-guess amount, card and date', () => {
+    const odd: InboxItem = {
+      id: 'odd1',
+      source: 'sms',
+      text: 'Bancolombia: Realizaste una compra por COP45.500,00 en TIENDA X con tu T.Cred *1342 el 13/10/2026 a las 09:15.',
+    };
+    const result = processInbox(baseData(), [odd]);
+    expect(result.deleteIds).toEqual([]);
+    expect(result.pending).toEqual([expect.objectContaining({
+      itemId: 'odd1', origin: 'sms', kind: 'expense', amount: 45500, currency: 'COP',
+      accountId: 'card', date: '2026-10-13', time: '09:15', category: '', rawText: odd.text,
+    })]);
+  });
+
+  it('still drops texts with no money in them (codes, marketing)', () => {
+    const otp: InboxItem = { id: 'otp', source: 'sms', text: 'Bancolombia: tu clave dinamica es 123456. No la compartas.' };
+    const ad: InboxItem = { id: 'ad', source: 'sms', text: 'Bancolombia: descubre los beneficios de tu tarjeta. Mas info en la app.' };
+    const result = processInbox(baseData(), [otp, ad]);
+    expect(result.pending).toEqual([]);
+    expect(result.deleteIds.sort()).toEqual(['ad', 'otp']);
+  });
+
+  it('is removed once booked from review', () => {
+    const odd: InboxItem = { id: 'odd2', source: 'sms', text: 'Bancolombia: Pagaste $12.000,00 en PARQUEADERO con tu T.Deb *2240.' };
+    const pending = processInbox(baseData(), [odd]).pending[0];
+    const booked = applyEntry(baseData(), { ...pending, category: 'Transport', description: 'Parqueadero' });
+    expect(processInbox(booked, [odd]).deleteIds).toEqual(['odd2']);
+  });
+});

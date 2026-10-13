@@ -126,7 +126,8 @@ export interface SmsCharge {
 
 /**
  * Book a bank-SMS card charge as the payment of the subscription whose
- * `smsMatch` appears in the merchant. Replaces (and refunds) a scheduled
+ * `smsMatch` appears in the merchant, at the SMS amount (or at the plan's own
+ * price when the SMS shows another currency). Replaces (and refunds) a scheduled
  * charge already booked for that period. Null when no subscription matches.
  */
 export const claimSubscriptionCharge = (data: AppData, charge: SmsCharge): AppData | null => {
@@ -140,10 +141,15 @@ export const claimSubscriptionCharge = (data: AppData, charge: SmsCharge): AppDa
   const scheduled = data.expenses.find(e => e.id === `sub-${sub.id}-${period}`);
   if (scheduled) accounts = withBalance(accounts, scheduled.accountId, scheduled.amount, scheduled.currency);
 
+  // A plan priced in another currency (a USD plan on a COP card) is billed in
+  // that currency; the SMS only shows an equivalent, so keep the plan's price.
+  const sameCurrency = charge.currency === sub.currency;
+  const amount = sameCurrency ? charge.amount : sub.amount;
+  const currency = sameCurrency ? charge.currency : sub.currency;
   const expense: Expense = {
     id: `inbox-${charge.itemId}`,
-    amount: charge.amount,
-    currency: charge.currency,
+    amount,
+    currency,
     description: sub.name,
     category: sub.category,
     date: charge.date,
@@ -153,7 +159,7 @@ export const claimSubscriptionCharge = (data: AppData, charge: SmsCharge): AppDa
   return {
     ...data,
     expenses: [...data.expenses.filter(e => e !== scheduled), expense],
-    accounts: withBalance(accounts, charge.accountId, -charge.amount, charge.currency),
+    accounts: withBalance(accounts, charge.accountId, -amount, currency),
     subscriptions: (data.subscriptions ?? []).map(s => (s.id === sub.id && (!s.lastChargedPeriod || s.lastChargedPeriod < period)
       ? { ...s, lastChargedPeriod: period }
       : s)),

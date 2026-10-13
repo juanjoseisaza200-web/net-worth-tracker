@@ -93,3 +93,26 @@ describe('parseBancolombiaSms', () => {
     expect(parseBancolombiaSms('Hola, ¿nos vemos mañana?')).toBeNull();
   });
 });
+
+describe('purchase SMS with the card at the end', () => {
+  // Real message for a subscription charge (2026-10-12).
+  const text = 'Bancolombia: Compraste COP20.900,00 en OPENAI *CHATGPT SUBS, el 12/10/2026 a las 16:39. Esta compra esta asociada a T.Cred *1342. Si tienes dudas, encuentranos aqui: 018000931987. Siempre contigo.';
+
+  it('reads amount, merchant, card and time', () => {
+    expect(parseBancolombiaSms(text)).toEqual({
+      kind: 'purchase',
+      amount: 20900,
+      currency: 'COP',
+      counterparty: 'OPENAI *CHATGPT SUBS',
+      source: 'credit',
+      last4: '1342',
+      date: '2026-10-12',
+      time: '16:39',
+    });
+  });
+
+  it('accepts the accented "está" and a debit card', () => {
+    const debit = text.replace('esta asociada a T.Cred', 'está asociada a T.Deb');
+    expect(parseBancolombiaSms(debit)).toMatchObject({ source: 'debit', last4: '1342', amount: 20900 });
+  });
+});

@@ -144,6 +144,13 @@ describe('claimSubscriptionCharge', () => {
     expect(out.subscriptions![0].lastChargedPeriod).toBe('2026-10');
   });
 
+  it('keeps the subscription price when the SMS shows another currency (a USD plan billed on a COP card)', () => {
+    const usd = sub({ smsMatch: 'netflix', amount: 6.74, currency: 'USD', lastChargedPeriod: '2026-09' });
+    const out = claimSubscriptionCharge(data([usd]), { ...charge, amount: 20900, currency: 'COP' })!;
+    expect(out.expenses[0]).toMatchObject({ amount: 6.74, currency: 'USD' });
+    expect(out.accounts[0].balance).toBeCloseTo(-100000 - 6.74 / 0.00024, 2);
+  });
+
   it('returns null when no active subscription matches the merchant', () => {
     expect(claimSubscriptionCharge(data([sub({ smsMatch: 'spotify' })]), charge)).toBeNull();
     expect(claimSubscriptionCharge(data([sub()]), charge)).toBeNull();
