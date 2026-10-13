@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useState } from 'react';
 import { Plus, Trash2, TrendingUp, TrendingDown, Calendar, Search, Hash, Repeat } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { AppData, Expense, Income, RecurringIncome, Currency } from '../types';
@@ -67,16 +67,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [editingIncome, setEditingIncome] = useState<Income | null>(null);
   const [editingRecurring, setEditingRecurring] = useState<RecurringIncome | null>(null);
-  const formRef = useRef<HTMLDivElement>(null);
 
-  // Income and recurring rows are tapped far down the list, but their edit
-  // form renders above it: bring the form into view. Expenses edit in place,
-  // right under the tapped row, so the screen doesn't move.
-  useEffect(() => {
-    if (editingIncome || editingRecurring) {
-      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [editingIncome, editingRecurring]);
   const chartColors = useIosColors();
 
   const [expenseForm, setExpenseForm] = useState({
@@ -327,6 +318,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   };
 
   const handleEditIncome = (income: Income) => {
+    if (editingIncome?.id === income.id) {
+      resetForms();
+      return;
+    }
     setEditingIncome(income);
     setIncomeForm({
       amount: income.amount.toString(),
@@ -341,6 +336,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
   };
 
   const handleEditRecurring = (recurring: RecurringIncome) => {
+    if (editingRecurring?.id === recurring.id) {
+      resetForms();
+      return;
+    }
     setEditingRecurring(recurring);
     setRecurringForm({
       amount: recurring.amount.toString(),
@@ -465,14 +464,17 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     setShowForm(false);
   };
 
-  // `inline`: the expense edit form, drawn under its row instead of up top.
+  const editingEntry = viewMode === 'expenses' ? editingExpense : viewMode === 'income' ? editingIncome : viewMode === 'recurring' ? editingRecurring : null;
+
+  // `inline`: an edit form, drawn right under the row being edited instead of
+  // up top, so the screen doesn't jump. New entries still use the top form.
   const renderForm = (inline = false) => {
-    if (!showForm) return null;
+    if (!showForm || !!editingEntry !== inline) return null;
+    const shell = inline ? 'p-4 bg-ios-fill border-l-[3px] border-ios-blue' : `${ios.card} p-4`;
 
     if (viewMode === 'expenses') {
-      if (!!editingExpense !== inline) return null;
       return (
-        <div className={inline ? 'p-4 bg-ios-fill border-l-[3px] border-ios-blue' : `${ios.card} p-4`}>
+        <div className={shell}>
           <h2 className="text-ios-headline mb-4 px-1">
             {editingExpense ? 'Edit Expense' : 'Add New Expense'}
           </h2>
@@ -562,7 +564,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
 
     if (viewMode === 'income') {
       return (
-        <div className={`${ios.card} p-4`}>
+        <div className={shell}>
           <h2 className="text-ios-headline mb-4 px-1">
             {editingIncome ? 'Edit Income' : 'Add New Income'}
           </h2>
@@ -651,7 +653,7 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
     }
 
     return (
-      <div className={`${ios.card} p-4`}>
+      <div className={shell}>
         <h2 className="text-ios-headline mb-4 px-1">
           {editingRecurring ? 'Edit Recurring Income' : 'Add Recurring Income'}
         </h2>
@@ -906,10 +908,10 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
         {viewMode === 'subscriptions' && <Subscriptions data={data} setData={setData} baseCurrency={baseCurrency} />}
 
         {/* Add Button: above the chart so it's reachable without scrolling */}
-        {(!showForm || (viewMode === 'expenses' && editingExpense)) && viewMode !== 'subscriptions' && (
+        {(!showForm || editingEntry) && viewMode !== 'subscriptions' && (
           <button
             onClick={() => {
-              if (viewMode === 'expenses' && editingExpense) resetForms(); // leave the in-place edit first
+              if (editingEntry) resetForms(); // leave the in-place edit first
               setShowForm(true);
               if (viewMode === 'expenses') {
                 setEditingExpense(null);
@@ -926,8 +928,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
           </button>
         )}
 
-        {/* Form (scroll-mt clears the sticky header when scrolled into view) */}
-        <div ref={formRef} className="scroll-mt-16 empty:hidden">
+        {/* Form for new entries (edits open under their row) */}
+        <div className="empty:hidden">
           {viewMode !== 'subscriptions' && renderForm()}
         </div>
 
@@ -1067,8 +1069,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                     action={<span className="text-ios-footnote text-ios-green tabular-nums">{formatCurrencyTrimmed(group.total, baseCurrency)}</span>}
                   >
                     {group.incomes.map(income => (
+                      <Fragment key={income.id}>
                       <Row
-                        key={income.id}
                         onClick={() => handleEditIncome(income)}
                         title={income.description}
                         subtitle={`${income.category} · ${accountNameById(income.accountId)}`}
@@ -1086,6 +1088,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                           </div>
                         }
                       />
+                      {editingIncome?.id === income.id && renderForm(true)}
+                      </Fragment>
                     ))}
                   </Section>
                 ));
@@ -1102,8 +1106,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
               data.recurringIncomes.map(recurring => {
                 const convertedAmount = convertCurrency(recurring.amount, recurring.currency, baseCurrency);
                 return (
+                  <Fragment key={recurring.id}>
                   <Row
-                    key={recurring.id}
                     onClick={() => handleEditRecurring(recurring)}
                     title={<span className={recurring.isActive ? '' : 'text-ios-secondary'}>{recurring.description}</span>}
                     subtitle={
@@ -1131,6 +1135,8 @@ export default function Expenses({ data, setData, baseCurrency, onCurrencyChange
                       </div>
                     }
                   />
+                  {editingRecurring?.id === recurring.id && renderForm(true)}
+                  </Fragment>
                 );
               })
             )}

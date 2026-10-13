@@ -74,6 +74,13 @@
   }
 }
 
+/* No scroll anchoring: rows open edit forms and details in place, and the
+   page must stay put rather than shift to keep some other element still
+   (Safari never anchors, so this matches the iPhone everywhere). */
+html {
+  overflow-anchor: none;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', 'Roboto',
