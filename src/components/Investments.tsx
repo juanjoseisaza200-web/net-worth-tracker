@@ -1029,7 +1029,7 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
     return (
       <Row
         key={stock.id}
-        icon={nested ? <span className="w-4" aria-hidden /> : undefined}
+        icon={nested ? <span className="block w-[3px] h-9 ml-2 rounded-full bg-ios-blue" aria-hidden /> : undefined}
         title={nested ? stock.broker || 'No Broker' : <span className="font-semibold">{stock.symbol}</span>}
         subtitle={
           <>
@@ -1093,7 +1093,8 @@ export default function Investments({ data, setData, saveLocalData, currencyFor,
           })}
           accessory={<ChevronDown size={18} strokeWidth={2.5} className={`shrink-0 ml-1 text-ios-tertiary transition-transform ${open ? 'rotate-180' : ''}`} />}
         />
-        {open && m.lots.map(lot => renderStockRow(lot, true))}
+        {/* Tinted so the lots read as the inside of the row above. */}
+        {open && <div className="bg-ios-fill">{m.lots.map(lot => renderStockRow(lot, true))}</div>}
       </Fragment>
     );
   };
